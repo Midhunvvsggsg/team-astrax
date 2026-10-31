@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Invoices & Recurring Billing - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Finance Operations</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Recurring Invoices</h1>
+      <p class="card-subtitle">Automated, idempotent recurring billing runs with taxes and applied discounts.</p>
+    </div>
+    <div style="display: flex; gap: var(--space-8); align-items: center;">
+      <!-- Run Billing Form Button -->
+      <form action="{% url 'invoicing:run_billing' %}" method="post" style="display: flex; gap: var(--space-8); align-items: center;">
+        {% csrf_token %}
+        <input type="date" name="as_of_date" value="{{ today|date:'Y-m-d' }}" class="form-input" style="width: 150px; padding: 6px 12px; font-size: 0.8rem;" title="Target Billing Date">
+        <button type="submit" class="btn btn-primary" onclick="return confirm('Execute automated recurring billing for all active subscriptions up to the selected date?')">
+          ⚡ Run Billing Engine
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Search & Filters -->
+  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by invoice #, customer email, sub #...">
+    </div>
+    <div style="min-width: 140px;">
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        {% for code, label in statuses %}
+          <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 180px;">
+      <select name="customer" class="form-select">
+        <option value="">All Customers</option>
+        {% for c in customers %}
+          <option value="{{ c.pk }}" {% if customer_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.email }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <input type="checkbox" name="overdue" value="yes" id="id_overdue" {% if overdue_filter == 'yes' %}checked{% endif %}>
+      <label for="id_overdue" style="font-size: var(--font-size-xs); font-weight: 600; cursor: pointer;">Overdue Only</label>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or status_filter or customer_filter or overdue_filter %}
+      <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Customer</th>
+            <th>Subscription</th>
+            <th>Billing Period</th>
+            <th>Due Date</th>
+            <th>Subtotal</th>
+            <th>Discount</th>
+            <th>Tax</th>
+            <th>Grand Total</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ inv.invoice_number }}
+                </a>
+              </td>
+              <td>
+                <div><strong>{{ inv.customer.full_name }}</strong></div>
+                <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ inv.customer.email }}</div>
+              </td>
+              <td>
+                <a href="{% url 'subscriptions:subscription_detail' pk=inv.subscription.pk %}" style="font-size: var(--font-size-xs);">
+                  {{ inv.subscription.subscription_number }}
+                </a>
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                {{ inv.period_start|date:"M d" }} → {{ inv.period_end|date:"M d, Y" }}
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                <span {% if inv.is_overdue %}style="color: var(--color-danger); font-weight: 700;"{% endif %}>
+                  {{ inv.due_date|date:"M d, Y" }}
+                </span>
+                {% if inv.is_overdue %}
+                  <span class="badge badge-overdue" style="font-size: 0.65rem;">OVERDUE</span>
+                {% endif %}
+              </td>
+              <td style="color: var(--color-text-muted);">${{ inv.subtotal }}</td>
+              <td style="color: var(--color-success); font-size: var(--font-size-xs);">
+                {% if inv.discount_total > 0 %}-${{ inv.discount_total }}{% else %}$0.00{% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs);">${{ inv.tax_total }}</td>
+              <td>
+                <strong style="color: var(--color-primary); font-size: var(--font-size-base);">${{ inv.grand_total }}</strong>
+              </td>
+              <td>
+                <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
+              </td>
+              <td style="text-align: right; white-space: nowrap;">
+                <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Manage</a>
+                <a href="{% url 'invoicing:invoice_print' pk=inv.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" target="_blank">Print</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🧾</div>
+    <h3 class="empty-state-title">No Invoices Found</h3>
+    <p class="empty-state-desc">
+      {% if search_query or status_filter or customer_filter or overdue_filter %}
+        No invoices match your selected filter criteria.
+      {% else %}
+        No recurring billing invoices generated yet. Click "Run Billing Engine" above to trigger automated invoicing for all active subscriptions.
+      {% endif %}
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

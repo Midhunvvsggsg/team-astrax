@@ -76,14 +76,49 @@
       </div>
     </div>
 
-    <!-- Empty State per Hackathon UI/UX rules -->
-    <div class="empty-state">
-      <div class="empty-state-icon">🧾</div>
-      <h3 class="empty-state-title">No Invoices Issued</h3>
-      <p class="empty-state-desc">
-        You are all caught up! Once a billing cycle runs, your generated invoices with line items and taxes will be accessible here.
-      </p>
-    </div>
+    {% if invoices %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Period</th>
+              <th>Due Date</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in invoices %}
+              <tr>
+                <td><strong>{{ inv.invoice_number }}</strong></td>
+                <td style="font-size: var(--font-size-xs);">{{ inv.period_start|date:"M d" }} - {{ inv.period_end|date:"M d, Y" }}</td>
+                <td style="font-size: var(--font-size-xs); {% if inv.is_overdue %}color: var(--color-danger); font-weight: 600;{% endif %}">
+                  {{ inv.due_date|date:"M d, Y" }}
+                </td>
+                <td><strong style="color: var(--color-primary);">${{ inv.grand_total }}</strong></td>
+                <td>
+                  <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
+                </td>
+                <td>
+                  <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">View</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <!-- Empty State per Hackathon UI/UX rules -->
+      <div class="empty-state">
+        <div class="empty-state-icon">🧾</div>
+        <h3 class="empty-state-title">No Invoices Issued</h3>
+        <p class="empty-state-desc">
+          You are all caught up! Once a billing cycle runs, your generated invoices with line items and taxes will be accessible here.
+        </p>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

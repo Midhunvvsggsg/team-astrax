@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ invoice.invoice_number }} - Invoice Details{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16); display: flex; justify-content: space-between; align-items: center;">
+  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'invoicing:invoice_list' %}{% endif %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back
+  </a>
+  <a href="{% url 'invoicing:invoice_print' pk=invoice.pk %}" class="btn btn-secondary" target="_blank">
+    🖨️ Print / PDF View
+  </a>
+</div>
+
+<!-- Header Card -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+        <span class="badge badge-inv-{{ invoice.status }}" style="font-size: var(--font-size-sm); padding: var(--space-4) var(--space-16);">
+          {{ invoice.get_status_display }}
+        </span>
+        {% if invoice.is_overdue %}
+          <span class="badge badge-overdue">OVERDUE</span>
+        {% endif %}
+      </div>
+      <h1 class="card-title">{{ invoice.invoice_number }}</h1>
+      <p class="card-subtitle">
+        Customer: <strong>{{ invoice.customer.full_name }}</strong> ({{ invoice.customer.email }})
+      </p>
+    </div>
+
+    <!-- Status Action Controls for Staff/Admin -->
+    {% if not user.is_customer %}
+      <div style="display: flex; gap: var(--space-8); align-items: center;">
+        {% if invoice.status == 'draft' %}
+          <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="new_status" value="confirmed">
+            <button type="submit" class="btn btn-primary">Confirm Invoice</button>
+          </form>
+          <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="new_status" value="cancelled">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Cancel this draft invoice?')">Cancel</button>
+          </form>
+        {% elif invoice.status == 'confirmed' %}
+          <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="new_status" value="cancelled">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Cancel this confirmed invoice?')">Cancel Invoice</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="grid-2" style="margin-top: var(--space-24); border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Subscription:</span>
+          <a href="{% url 'subscriptions:subscription_detail' pk=invoice.subscription.pk %}" style="font-weight: 600;">
+            {{ invoice.subscription.subscription_number }} ({{ invoice.subscription.plan.name }})
+          </a>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Billing Period:</span>
+          <strong>{{ invoice.period_start|date:"M d, Y" }} → {{ invoice.period_end|date:"M d, Y" }}</strong>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Issue Date:</span>
+          <span>{{ invoice.issue_date|date:"F d, Y" }}</span>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Payment Due Date:</span>
+          <span {% if invoice.is_overdue %}style="color: var(--color-danger); font-weight: 700;"{% endif %}>
+            {{ invoice.due_date|date:"F d, Y" }}
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Invoice Lines Card -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Invoice Itemized Breakdown</h2>
+    <p class="card-subtitle">Product and service charges calculated from subscription rules</p>
+  </div>
+
+  <div class="table-container">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Quantity</th>
+          <th>Unit Price</th>
+          <th>Discount</th>
+          <th>Tax Rate</th>
+          <th>Line Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+          <tr>
+            <td><strong>{{ line.description }}</strong></td>
+            <td>{{ line.quantity }}</td>
+            <td>${{ line.unit_price }}</td>
+            <td>
+              {% if line.discount_amount > 0 %}
+                <span style="color: var(--color-success); font-weight: 600;">-${{ line.discount_amount }}</span>
+              {% else %}
+                <span style="color: var(--color-text-muted);">$0.00</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if line.tax %}
+                <span style="font-size: var(--font-size-xs);">{{ line.tax.name }} (+${{ line.tax_amount }})</span>
+              {% else %}
+                <span style="color: var(--color-text-muted);">$0.00</span>
+              {% endif %}
+            </td>
+            <td><strong>${{ line.amount }}</strong></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Totals Summary -->
+  <div style="display: flex; justify-content: flex-end; margin-top: var(--space-24);">
+    <div style="min-width: 300px; background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md);">
+      <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
+        <span style="color: var(--color-text-muted);">Subtotal:</span>
+        <span>${{ invoice.subtotal }}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm); color: var(--color-success);">
+        <span>Applied Discounts:</span>
+        <span>-${{ invoice.discount_total }}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
+        <span style="color: var(--color-text-muted);">Taxes:</span>
+        <span>+${{ invoice.tax_total }}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: var(--space-8); font-size: var(--font-size-xl); font-weight: 800;">
+        <span>Grand Total:</span>
+        <span style="color: var(--color-primary);">${{ invoice.grand_total }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

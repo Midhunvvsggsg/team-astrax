@@ -536,6 +536,29 @@ a:hover {
   color: #b91c1c;
 }
 
+/* Invoice status badges */
+.badge-inv-draft {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.badge-inv-confirmed {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+.badge-inv-paid {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.badge-inv-cancelled {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+.badge-overdue {
+  background-color: #fee2e2;
+  color: #dc2626;
+  font-weight: 700;
+}
+
 /* Grid helper */
 .grid-2 {
   display: grid;
