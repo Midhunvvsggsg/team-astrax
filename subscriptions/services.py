@@ -1,8 +1,10 @@
-from decimal import Decimal
-from datetime import date
 from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
 from typing import List
+
 from .models import DiscountRule, Subscription
+
 
 @dataclass
 class ApplicableDiscount:
@@ -31,7 +33,7 @@ class ApplicableDiscount:
 def get_applicable_discounts(subscription: Subscription, billing_date: date = None) -> List[ApplicableDiscount]:
     """
     Evaluates all active discount rules against the subscription and specified billing date.
-    
+
     Validations performed:
     1. Active status check (`is_active=True`).
     2. Date range check (`start_date <= billing_date <= end_date`).
@@ -104,13 +106,13 @@ def get_applicable_discounts(subscription: Subscription, billing_date: date = No
 
         elif rule.scope == DiscountRule.Scope.SPECIFIC_PRODUCTS:
             eligible_product_ids = set(rule.products.values_list('id', flat=True))
-            matching_lines = [l for l in lines if l.product_id in eligible_product_ids]
+            matching_lines = [line for line in lines if line.product_id in eligible_product_ids]
 
             if not matching_lines:
                 continue
 
-            eligible_quantity = sum(l.quantity for l in matching_lines)
-            eligible_amount = sum(l.line_subtotal for l in matching_lines)
+            eligible_quantity = sum(line.quantity for line in matching_lines)
+            eligible_amount = sum(line.line_subtotal for line in matching_lines)
 
             # Minimum requirements
             if eligible_quantity < rule.min_quantity:

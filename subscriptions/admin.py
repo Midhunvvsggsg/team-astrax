@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory, DiscountRule
+
+from .models import (
+    DiscountRule,
+    QuotationTemplate,
+    QuotationTemplateLine,
+    Subscription,
+    SubscriptionLine,
+    SubscriptionStatusHistory,
+)
+
 
 class QuotationTemplateLineInline(admin.TabularInline):
     model = QuotationTemplateLine

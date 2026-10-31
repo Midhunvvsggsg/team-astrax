@@ -1,7 +1,9 @@
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
+
 from accounts.models import User
 from accounts.validators import BrightloopPasswordValidator
-from django.core.exceptions import ValidationError
+
 
 class Command(BaseCommand):
     help = "Creates an initial Admin user for Brightloop Subscription Management System"

@@ -1,9 +1,11 @@
 from django import forms
-from django.contrib.auth import authenticate, password_validation
+from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+
 from .models import User
 from .validators import BrightloopPasswordValidator
+
 
 class CustomerSignupForm(forms.ModelForm):
     password = forms.CharField(

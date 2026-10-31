@@ -1,19 +1,25 @@
 from datetime import date, datetime
 from decimal import Decimal
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.core.paginator import Paginator
-from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import send_mail
+
 from django.conf import settings
-from django.utils import timezone
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
 from accounts.decorators import staff_or_admin_required
 from accounts.models import User
-from .models import Invoice, InvoiceLine, Payment
-from .forms import PaymentForm
-from .services import generate_invoices
+
 from .dashboard import get_finance_dashboard_context
+from .forms import PaymentForm
+from .models import Invoice, Payment
+from .services import generate_invoices
+
 
 @staff_or_admin_required
 def finance_dashboard(request):
@@ -166,14 +172,13 @@ def overdue_invoices(request):
         'total_overdue_count': total_overdue_count,
     })
 
+@login_required
 def payment_list(request):
     """
     Payments list with filters (method, date range).
     - Staff & Admin see all payments recorded in the system.
     - Customers see only their own payment history.
     """
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     search_query = request.GET.get('q', '').strip()
     method_filter = request.GET.get('method', '').strip()
@@ -223,14 +228,13 @@ def payment_list(request):
         'total_amount': total_amount,
     })
 
+@login_required
 def invoice_detail(request, pk):
     """
     Detailed view of an invoice:
     - Staff & Admin can view any invoice, transition status, send, and record payments.
     - Customer can ONLY view their own invoice (returns 404 for other customers' invoices).
     """
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     # Enforce strict customer isolation: query strictly scoped to request.user returning 404
     if request.user.is_customer:
@@ -261,10 +265,9 @@ def invoice_detail(request, pk):
         'payment_form': payment_form,
     })
 
+@login_required
 def invoice_print(request, pk):
     """Clean, printer-friendly invoice layout."""
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     # Enforce strict customer isolation: query strictly scoped to request.user returning 404
     if request.user.is_customer:
@@ -289,6 +292,7 @@ def invoice_print(request, pk):
     })
 
 @staff_or_admin_required
+@require_POST
 def invoice_transition(request, pk):
     """Transitions invoice status (Confirm, Cancel, Mark Paid)."""
     invoice = get_object_or_404(Invoice, pk=pk)
@@ -303,6 +307,7 @@ def invoice_transition(request, pk):
     return redirect('invoicing:invoice_detail', pk=invoice.pk)
 
 @staff_or_admin_required
+@require_POST
 def invoice_send(request, pk):
     """Sends invoice to the customer via email using the configured console email backend."""
     invoice = get_object_or_404(Invoice, pk=pk)
@@ -344,6 +349,7 @@ def invoice_send(request, pk):
     return redirect('invoicing:invoice_detail', pk=invoice.pk)
 
 @staff_or_admin_required
+@require_POST
 def payment_create(request, pk):
     """
     Records a payment against an invoice.
@@ -389,6 +395,7 @@ def payment_create(request, pk):
     return redirect('invoicing:invoice_detail', pk=invoice.pk)
 
 @staff_or_admin_required
+@require_POST
 def run_billing(request):
     """Runs billing engine on demand for all active subscriptions."""
     if request.method == 'POST':

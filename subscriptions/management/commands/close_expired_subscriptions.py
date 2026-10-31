@@ -1,6 +1,9 @@
 from datetime import date
+
 from django.core.management.base import BaseCommand
+
 from subscriptions.models import Subscription
+
 
 class Command(BaseCommand):
     help = "Closes active subscriptions that have passed their expiry date and have plan.auto_close_on_end enabled."

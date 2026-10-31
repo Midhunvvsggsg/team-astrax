@@ -1,15 +1,18 @@
-from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.db import IntegrityError
-from django.core.exceptions import ValidationError
+from decimal import Decimal
+
 from django.core import mail
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.test import Client, TestCase
+from django.urls import reverse
+
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Tax, Plan
-from subscriptions.models import Subscription, SubscriptionLine, DiscountRule
-from invoicing.models import Invoice, InvoiceLine, Payment
-from invoicing.services import generate_invoices, advance_period_date, add_months
+from catalog.models import Plan, Product, Tax
+from invoicing.models import Invoice, Payment
+from invoicing.services import advance_period_date, generate_invoices
+from subscriptions.models import DiscountRule, Subscription, SubscriptionLine
+
 
 class InvoiceGenerationServiceTests(TestCase):
     def setUp(self):
@@ -253,6 +256,18 @@ class InvoiceViewAndCustomerIsolationTests(TestCase):
         response = self.client.get(reverse('invoicing:invoice_detail', kwargs={'pk': self.inv_alice.pk}))
         self.assertEqual(response.status_code, 404)
 
+    def test_unauthenticated_access_to_invoice_detail_and_print_redirects_to_login(self):
+        """Unauthenticated requests to invoice detail and print must be redirected to login."""
+        detail_url = reverse('invoicing:invoice_detail', kwargs={'pk': self.inv_alice.pk})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 302)
+        self.assertIn(reverse('login'), resp_detail.url)
+
+        print_url = reverse('invoicing:invoice_print', kwargs={'pk': self.inv_alice.pk})
+        resp_print = self.client.get(print_url)
+        self.assertEqual(resp_print.status_code, 302)
+        self.assertIn(reverse('login'), resp_print.url)
+
     def test_staff_can_view_invoice_list_and_run_billing(self):
         self.client.force_login(self.staff)
         # View list
@@ -349,6 +364,28 @@ class InvoiceStatusTransitionTests(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             self.invoice.transition_to(Invoice.Status.PAID)
         self.assertIn("Draft invoice must be Confirmed before being marked Paid", str(ctx.exception))
+
+    def test_invoice_mutation_views_reject_get_with_405(self):
+        """GET request to invoice transition, send, payment create, or run billing must return 405."""
+        staff_user = User.objects.create_user(
+            email='staff_tester@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.client.force_login(staff_user)
+
+        res_trans = self.client.get(reverse('invoicing:invoice_transition', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_trans.status_code, 405)
+
+        res_send = self.client.get(reverse('invoicing:invoice_send', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_send.status_code, 405)
+
+        res_pay = self.client.get(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_pay.status_code, 405)
+
+        res_bill = self.client.get(reverse('invoicing:run_billing'))
+        self.assertEqual(res_bill.status_code, 405)
+
 
 
 class InvoiceSendAndPrintTests(TestCase):
@@ -837,6 +874,12 @@ class PaymentListAndPermissionTests(TestCase):
             note='Bob Wire Transfer',
             recorded_by=self.staff
         )
+
+    def test_unauthenticated_user_redirected_to_login_on_payment_list(self):
+        """Unauthenticated request to payment list must be redirected to login."""
+        res = self.client.get(reverse('invoicing:payment_list'))
+        self.assertEqual(res.status_code, 302)
+        self.assertIn(reverse('login'), res.url)
 
     def test_customer_sees_only_own_payments(self):
         """Alice sees only her payment; cannot see Bob's."""

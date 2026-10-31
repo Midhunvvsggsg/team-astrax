@@ -1,9 +1,11 @@
-from django.test import TestCase, Client
-from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.test import Client, TestCase
+from django.urls import reverse
+
+from accounts.forms import CustomerSignupForm
 from accounts.models import User
 from accounts.validators import BrightloopPasswordValidator
-from accounts.forms import CustomerSignupForm, StaffCreationForm
+
 
 class CustomUserModelTests(TestCase):
     def test_create_user_normalizes_and_lowercases_email(self):
@@ -221,11 +223,12 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
         )
 
         # Plans
-        from decimal import Decimal
         from datetime import date, timedelta
+        from decimal import Decimal
+
         from catalog.models import Plan, Product
-        from subscriptions.models import Subscription, SubscriptionLine
         from invoicing.models import Invoice, Payment
+        from subscriptions.models import Subscription, SubscriptionLine
 
         self.plan_pausable = Plan.objects.create(
             name="Pausable & Renewable Plan",
@@ -481,4 +484,46 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
         self.assertRedirects(resp_success, reverse('customer_portal'))
         self.customer_a.refresh_from_db()
         self.assertTrue(self.customer_a.check_password('BrandNewPass@999'))
+
+    def test_logout_view_rejects_get_with_405(self):
+        """GET request to logout must be rejected with 405 Method Not Allowed (CSRF prevention)."""
+        self.client.force_login(self.customer_a)
+        response = self.client.get(reverse('logout'))
+        self.assertEqual(response.status_code, 405)
+
+    def test_logout_view_succeeds_on_post(self):
+        """POST request to logout successfully logs out the session."""
+        self.client.force_login(self.customer_a)
+        response = self.client.post(reverse('logout'), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse('login'))
+
+    def test_security_settings_headers(self):
+        """Verify essential security headers and cookie policies are configured."""
+        from django.conf import settings
+        self.assertEqual(settings.X_FRAME_OPTIONS, 'DENY')
+        self.assertTrue(settings.SECURE_CONTENT_TYPE_NOSNIFF)
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+        self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Lax')
+        self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Lax')
+
+    def test_insecure_secret_key_rejected_in_production(self):
+        """Verify that DEBUG=False with default insecure secret key is rejected."""
+        from django.core.exceptions import ImproperlyConfigured
+
+        from config.settings import INSECURE_DEV_SECRET
+
+        def check_prod_secret(debug, secret_key, argv):
+            if not debug and 'test' not in argv:
+                if not secret_key or secret_key == INSECURE_DEV_SECRET:
+                    raise ImproperlyConfigured("SECRET_KEY must be configured with a secure value when DEBUG=False.")
+            return True
+
+        with self.assertRaises(ImproperlyConfigured):
+            check_prod_secret(False, INSECURE_DEV_SECRET, ['gunicorn', 'config.wsgi'])
+
+        # Secure key should succeed
+        self.assertTrue(check_prod_secret(False, 'super-secure-random-key-12345', ['gunicorn', 'config.wsgi']))
+
+
 

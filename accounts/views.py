@@ -1,28 +1,33 @@
 from datetime import date
 from decimal import Decimal
-from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout, update_session_auth_hash
+
 from django.contrib import messages
+from django.contrib.auth import login, logout, update_session_auth_hash
+from django.contrib.auth.views import (
+    PasswordResetCompleteView,
+    PasswordResetConfirmView,
+    PasswordResetDoneView,
+    PasswordResetView,
+)
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.contrib.auth.views import (
-    PasswordResetView,
-    PasswordResetDoneView,
-    PasswordResetConfirmView,
-    PasswordResetCompleteView
-)
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
-from .models import User
-from .forms import (
-    CustomerSignupForm,
-    StaffCreationForm,
-    LoginForm,
-    CustomerProfileForm,
-    CustomerPasswordChangeForm,
-)
-from .decorators import admin_required, customer_required, staff_or_admin_required
-from invoicing.models import Invoice, Payment
+from django.views.decorators.http import require_POST
+
 from invoicing.dashboard import get_finance_dashboard_context
+from invoicing.models import Invoice, Payment
+
+from .decorators import admin_required, customer_required, staff_or_admin_required
+from .forms import (
+    CustomerPasswordChangeForm,
+    CustomerProfileForm,
+    CustomerSignupForm,
+    LoginForm,
+    StaffCreationForm,
+)
+from .models import User
+
 
 def home_view(request):
     """Landing page and routing hub based on authentication status and role."""
@@ -71,7 +76,7 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             messages.success(request, f"Signed in successfully as {user.get_role_display()}.")
-            
+
             # Safe redirect
             if next_url and next_url.startswith('/'):
                 return redirect(next_url)
@@ -85,8 +90,9 @@ def login_view(request):
 
     return render(request, 'accounts/login.html', {'form': form, 'next': next_url})
 
+@require_POST
 def logout_view(request):
-    """Logs out the active session."""
+    """Logs out the active session (POST-only to prevent CSRF logout attacks)."""
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('login')

@@ -1,5 +1,8 @@
 import os
+import sys
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -7,11 +10,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env if present
 load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'brightloop-hackathon-insecure-key-for-dev')
+INSECURE_DEV_SECRET = 'brightloop-hackathon-insecure-key-for-dev'
+SECRET_KEY = os.getenv('SECRET_KEY', INSECURE_DEV_SECRET)
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+# In production (DEBUG=False and not running tests), an explicit secure SECRET_KEY is mandatory
+if not DEBUG and 'test' not in sys.argv:
+    if not SECRET_KEY or SECRET_KEY == INSECURE_DEV_SECRET:
+        raise ImproperlyConfigured("SECRET_KEY must be configured with a secure value when DEBUG=False.")
+
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
-if 'testserver' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('testserver')
+if DEBUG or 'test' in sys.argv:
+    if 'testserver' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('testserver')
 
 # Application definition
 INSTALLED_APPS = [
@@ -21,7 +32,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Project apps
     'accounts',
     'catalog',
@@ -96,3 +107,17 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'support@brightloop.local'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Security Hardening Settings
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Optional SSL Redirect for production deployments
+if os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes'):
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+

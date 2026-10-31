@@ -1,7 +1,12 @@
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 
 class CustomUserManager(BaseUserManager):
     def get_by_natural_key(self, username):
@@ -13,7 +18,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(_("The Email field must be set"))
         email = self.normalize_email(email).lower()
         extra_fields.setdefault('role', User.Role.CUSTOMER)
-        
+
         # Keep Django admin flags consistent with role
         role = extra_fields.get('role')
         if role == User.Role.ADMIN:

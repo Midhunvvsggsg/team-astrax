@@ -1,20 +1,23 @@
-from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
-from django.urls import reverse
+from decimal import Decimal
+from io import StringIO
+
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from io import StringIO
+from django.test import Client, TestCase
+from django.urls import reverse
+
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Tax, Plan
+from catalog.models import Plan, Product, Tax
+
 from .models import (
+    DiscountRule,
     QuotationTemplate,
     QuotationTemplateLine,
     Subscription,
     SubscriptionLine,
-    SubscriptionStatusHistory,
-    DiscountRule,
 )
+
 
 class SubscriptionLifecycleAndTransitionsTests(TestCase):
     def setUp(self):
@@ -365,6 +368,32 @@ class SubscriptionCustomerPermissionIsolationTests(TestCase):
         response = self.client.get(reverse('subscriptions:subscription_detail', kwargs={'pk': self.sub_alice.pk}))
         self.assertEqual(response.status_code, 404)
 
+    def test_unauthenticated_user_redirected_to_login_on_subscription_detail(self):
+        """Unauthenticated request to subscription detail must redirect to login."""
+        response = self.client.get(reverse('subscriptions:subscription_detail', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+
+    def test_customer_action_and_subscription_mutation_reject_get_with_405(self):
+        """GET requests to customer action or staff transition/renew must return 405."""
+        self.client.force_login(self.customer1)
+        res_action = self.client.get(reverse('subscriptions:customer_action', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_action.status_code, 405)
+
+        staff_user = User.objects.create_user(
+            email='sub_staff_tester@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.client.force_login(staff_user)
+        res_trans = self.client.get(reverse('subscriptions:subscription_transition', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_trans.status_code, 405)
+
+        res_renew = self.client.get(reverse('subscriptions:subscription_renew', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_renew.status_code, 405)
+
+
+
 
 class DiscountRulesAndServiceTests(TestCase):
     def setUp(self):
@@ -457,6 +486,7 @@ class DiscountRulesAndServiceTests(TestCase):
         )
         discounts = get_applicable_discounts(self.sub, billing_date=date.today())
         self.assertEqual(len(discounts), 1)
+        self.assertEqual(discounts[0].rule, rule)
         # Should be capped at $250.00 (the eligible amount) so line/total is never negative
         self.assertEqual(discounts[0].calculated_amount, Decimal('250.00'))
 
@@ -667,8 +697,8 @@ class QueryCountAndSeedTests(TestCase):
 
     def test_subscriptions_list_query_count_is_bounded_and_no_n_plus_one(self):
         """Verify subscription list uses prefetch and select_related, bounding queries <= 10."""
-        from django.test.utils import CaptureQueriesContext
         from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
         self.client.force_login(self.admin)
         with CaptureQueriesContext(connection) as ctx:
@@ -680,8 +710,8 @@ class QueryCountAndSeedTests(TestCase):
 
     def test_customer_portal_query_count_is_bounded(self):
         """Verify customer portal page bounds query count and prevents N+1 payment calculations."""
-        from django.test.utils import CaptureQueriesContext
         from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
         self.client.force_login(self.customer)
         with CaptureQueriesContext(connection) as ctx:
