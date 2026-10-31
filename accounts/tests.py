@@ -482,3 +482,17 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
         self.customer_a.refresh_from_db()
         self.assertTrue(self.customer_a.check_password('BrandNewPass@999'))
 
+    def test_logout_view_rejects_get_with_405(self):
+        """GET request to logout must be rejected with 405 Method Not Allowed (CSRF prevention)."""
+        self.client.force_login(self.customer_a)
+        response = self.client.get(reverse('logout'))
+        self.assertEqual(response.status_code, 405)
+
+    def test_logout_view_succeeds_on_post(self):
+        """POST request to logout successfully logs out the session."""
+        self.client.force_login(self.customer_a)
+        response = self.client.post(reverse('logout'), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse('login'))
+
+

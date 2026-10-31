@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, update_session_auth_hash
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -85,8 +86,9 @@ def login_view(request):
 
     return render(request, 'accounts/login.html', {'form': form, 'next': next_url})
 
+@require_POST
 def logout_view(request):
-    """Logs out the active session."""
+    """Logs out the active session (POST-only to prevent CSRF logout attacks)."""
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('login')
