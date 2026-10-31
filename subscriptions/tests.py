@@ -365,6 +365,13 @@ class SubscriptionCustomerPermissionIsolationTests(TestCase):
         response = self.client.get(reverse('subscriptions:subscription_detail', kwargs={'pk': self.sub_alice.pk}))
         self.assertEqual(response.status_code, 404)
 
+    def test_unauthenticated_user_redirected_to_login_on_subscription_detail(self):
+        """Unauthenticated request to subscription detail must redirect to login."""
+        response = self.client.get(reverse('subscriptions:subscription_detail', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+
+
 
 class DiscountRulesAndServiceTests(TestCase):
     def setUp(self):

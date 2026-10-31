@@ -253,6 +253,18 @@ class InvoiceViewAndCustomerIsolationTests(TestCase):
         response = self.client.get(reverse('invoicing:invoice_detail', kwargs={'pk': self.inv_alice.pk}))
         self.assertEqual(response.status_code, 404)
 
+    def test_unauthenticated_access_to_invoice_detail_and_print_redirects_to_login(self):
+        """Unauthenticated requests to invoice detail and print must be redirected to login."""
+        detail_url = reverse('invoicing:invoice_detail', kwargs={'pk': self.inv_alice.pk})
+        resp_detail = self.client.get(detail_url)
+        self.assertEqual(resp_detail.status_code, 302)
+        self.assertIn(reverse('login'), resp_detail.url)
+
+        print_url = reverse('invoicing:invoice_print', kwargs={'pk': self.inv_alice.pk})
+        resp_print = self.client.get(print_url)
+        self.assertEqual(resp_print.status_code, 302)
+        self.assertIn(reverse('login'), resp_print.url)
+
     def test_staff_can_view_invoice_list_and_run_billing(self):
         self.client.force_login(self.staff)
         # View list
@@ -837,6 +849,12 @@ class PaymentListAndPermissionTests(TestCase):
             note='Bob Wire Transfer',
             recorded_by=self.staff
         )
+
+    def test_unauthenticated_user_redirected_to_login_on_payment_list(self):
+        """Unauthenticated request to payment list must be redirected to login."""
+        res = self.client.get(reverse('invoicing:payment_list'))
+        self.assertEqual(res.status_code, 302)
+        self.assertIn(reverse('login'), res.url)
 
     def test_customer_sees_only_own_payments(self):
         """Alice sees only her payment; cannot see Bob's."""

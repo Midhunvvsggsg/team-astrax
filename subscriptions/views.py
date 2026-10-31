@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
@@ -59,6 +60,7 @@ def subscription_list(request):
         'statuses': Subscription.Status.choices,
     })
 
+@login_required
 def subscription_detail(request, pk):
     """
     Detailed view of subscription:
@@ -66,8 +68,6 @@ def subscription_detail(request, pk):
     - Customer can ONLY view their own subscription (returns 404 for other customers).
     - Exposes permitted lifecycle actions (pause, resume, renew, close) for customer.
     """
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     # Enforce strict customer isolation: query strictly scoped to request.user returning 404
     if request.user.is_customer:

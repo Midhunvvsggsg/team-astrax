@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
@@ -166,14 +167,13 @@ def overdue_invoices(request):
         'total_overdue_count': total_overdue_count,
     })
 
+@login_required
 def payment_list(request):
     """
     Payments list with filters (method, date range).
     - Staff & Admin see all payments recorded in the system.
     - Customers see only their own payment history.
     """
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     search_query = request.GET.get('q', '').strip()
     method_filter = request.GET.get('method', '').strip()
@@ -223,14 +223,13 @@ def payment_list(request):
         'total_amount': total_amount,
     })
 
+@login_required
 def invoice_detail(request, pk):
     """
     Detailed view of an invoice:
     - Staff & Admin can view any invoice, transition status, send, and record payments.
     - Customer can ONLY view their own invoice (returns 404 for other customers' invoices).
     """
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     # Enforce strict customer isolation: query strictly scoped to request.user returning 404
     if request.user.is_customer:
@@ -261,10 +260,9 @@ def invoice_detail(request, pk):
         'payment_form': payment_form,
     })
 
+@login_required
 def invoice_print(request, pk):
     """Clean, printer-friendly invoice layout."""
-    if not request.user.is_authenticated:
-        return redirect(f"/accounts/login/?next={request.path}")
 
     # Enforce strict customer isolation: query strictly scoped to request.user returning 404
     if request.user.is_customer:
