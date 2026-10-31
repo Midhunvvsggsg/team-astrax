@@ -7,12 +7,34 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 
+class InvoiceQuerySet(models.QuerySet):
+    def with_payment_totals(self):
+        """Annotates SQL aggregate amount_paid and amount_due to prevent N+1 queries."""
+        from django.db.models import Sum, F, DecimalField, Value
+        from django.db.models.functions import Coalesce, Greatest
+
+        return self.annotate(
+            annotated_amount_paid=Coalesce(
+                Sum('payments__amount'),
+                Value(Decimal('0.00')),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        ).annotate(
+            annotated_amount_due=Greatest(
+                F('grand_total') - F('annotated_amount_paid'),
+                Value(Decimal('0.00')),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        ).order_by('-issue_date', '-id')
+
 class Invoice(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'draft', _('Draft')
         CONFIRMED = 'confirmed', _('Confirmed')
         PAID = 'paid', _('Paid')
         CANCELLED = 'cancelled', _('Cancelled')
+
+    objects = InvoiceQuerySet.as_manager()
 
     invoice_number = models.CharField(
         _('invoice number'),
@@ -118,20 +140,34 @@ class Invoice(models.Model):
 
     @property
     def is_overdue(self):
-        """True if invoice is unpaid and past due date."""
+        """True if invoice is unpaid, not cancelled, and past due date."""
         if self.status in [self.Status.PAID, self.Status.CANCELLED]:
+            return False
+        if self.amount_due <= Decimal('0.00'):
             return False
         return date.today() > self.due_date
 
     @property
+    def days_overdue(self):
+        """Days past the due date if overdue, otherwise 0."""
+        if not self.is_overdue:
+            return 0
+        return max(0, (date.today() - self.due_date).days)
+
+    @property
     def amount_paid(self):
-        """Total payments recorded against this invoice."""
-        payments = self.payments.all()
-        return sum((p.amount for p in payments), Decimal('0.00')).quantize(Decimal('0.01'))
+        """Total payments recorded against this invoice via SQL aggregate."""
+        if hasattr(self, 'annotated_amount_paid'):
+            return self.annotated_amount_paid
+        from django.db.models import Sum
+        val = self.payments.aggregate(total=Sum('amount'))['total']
+        return (val if val is not None else Decimal('0.00')).quantize(Decimal('0.01'))
 
     @property
     def amount_due(self):
-        """Remaining balance unpaid on this invoice."""
+        """Remaining balance unpaid on this invoice via SQL aggregate."""
+        if hasattr(self, 'annotated_amount_due'):
+            return self.annotated_amount_due
         return max(Decimal('0.00'), self.grand_total - self.amount_paid).quantize(Decimal('0.01'))
 
     def can_transition_to(self, new_status):
@@ -212,25 +248,32 @@ class InvoiceLine(models.Model):
 
 class Payment(models.Model):
     class Method(models.TextChoices):
-        BANK_TRANSFER = 'bank_transfer', _('Bank Transfer')
-        CREDIT_CARD = 'credit_card', _('Credit Card')
         CASH = 'cash', _('Cash')
-        CHECK = 'check', _('Check')
-        OTHER = 'other', _('Other')
+        BANK_TRANSFER = 'bank_transfer', _('Bank Transfer')
+        CARD = 'card', _('Card')
+        UPI = 'upi', _('UPI')
+        CHEQUE = 'cheque', _('Cheque')
 
     invoice = models.ForeignKey(Invoice, related_name='payments', on_delete=models.CASCADE)
+    method = models.CharField(
+        _('payment method'),
+        max_length=50,
+        choices=Method.choices,
+        default=Method.BANK_TRANSFER,
+        db_column='payment_method',
+        db_index=True,
+    )
     amount = models.DecimalField(
         _('amount ($)'),
         max_digits=12,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))]
     )
-    payment_date = models.DateField(_('payment date'), default=timezone.now)
-    payment_method = models.CharField(
-        _('payment method'),
-        max_length=50,
-        choices=Method.choices,
-        default=Method.BANK_TRANSFER
+    date = models.DateField(
+        _('payment date'),
+        default=timezone.now,
+        db_column='payment_date',
+        db_index=True,
     )
     note = models.TextField(_('notes'), blank=True)
     recorded_by = models.ForeignKey(
@@ -245,8 +288,49 @@ class Payment(models.Model):
     class Meta:
         verbose_name = _('payment')
         verbose_name_plural = _('payments')
-        ordering = ['-payment_date', '-created_at']
+        ordering = ['-date', '-created_at']
 
     def __str__(self):
-        return f"Payment of ${self.amount} for {self.invoice.invoice_number} ({self.get_payment_method_display()})"
+        return f"Payment of ${self.amount} for {self.invoice.invoice_number} ({self.get_method_display()})"
+
+    @property
+    def payment_date(self):
+        return self.date
+
+    @property
+    def payment_method(self):
+        return self.method
+
+    def get_payment_method_display(self):
+        return self.get_method_display()
+
+    def clean(self):
+        super().clean()
+        if self.amount is not None:
+            if self.amount <= Decimal('0.00'):
+                raise ValidationError({'amount': _("Payment amount must be greater than zero.")})
+            if hasattr(self, 'invoice') and self.invoice:
+                if self.invoice.status != Invoice.Status.CONFIRMED:
+                    raise ValidationError(_("Payments can only be recorded on Confirmed invoices."))
+                from django.db.models import Sum
+                current_paid = self.invoice.payments.exclude(pk=self.pk).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
+                remaining = self.invoice.grand_total - current_paid
+                if self.amount > remaining:
+                    raise ValidationError({
+                        'amount': _(f"Overpayment not allowed. Payment amount (${self.amount}) exceeds remaining balance (${remaining}).")
+                    })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        if self.invoice:
+            from django.db.models import Sum
+            total_paid = self.invoice.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            if total_paid >= self.invoice.grand_total:
+                if self.invoice.status != Invoice.Status.PAID:
+                    self.invoice.status = Invoice.Status.PAID
+                    self.invoice.save(update_fields=['status', 'updated_at'])
+
 

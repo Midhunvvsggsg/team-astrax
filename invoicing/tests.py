@@ -545,8 +545,8 @@ class InvoicePaymentAndReconciliationTests(TestCase):
         self.client.force_login(self.admin)
         res = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
             'amount': '40.00',
-            'payment_date': '2026-01-12',
-            'payment_method': Payment.Method.BANK_TRANSFER,
+            'date': '2026-01-12',
+            'method': Payment.Method.BANK_TRANSFER,
             'note': 'Initial installment'
         }, follow=True)
         self.assertEqual(res.status_code, 200)
@@ -561,8 +561,8 @@ class InvoicePaymentAndReconciliationTests(TestCase):
         self.client.force_login(self.admin)
         res = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
             'amount': '100.00',
-            'payment_date': '2026-01-14',
-            'payment_method': Payment.Method.CREDIT_CARD,
+            'date': '2026-01-14',
+            'method': Payment.Method.CARD,
             'note': 'Full payment'
         }, follow=True)
         self.assertEqual(res.status_code, 200)
@@ -571,4 +571,300 @@ class InvoicePaymentAndReconciliationTests(TestCase):
         self.assertEqual(self.invoice.amount_paid, Decimal('100.00'))
         self.assertEqual(self.invoice.amount_due, Decimal('0.00'))
         self.assertEqual(self.invoice.status, Invoice.Status.PAID)
+
+    def test_partial_then_full_payment_flips_to_paid(self):
+        """Sequential payments: partial ($40) leaves Confirmed, remaining ($60) flips to Paid."""
+        self.client.force_login(self.admin)
+
+        # Payment 1: $40.00
+        self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
+            'amount': '40.00',
+            'date': '2026-01-10',
+            'method': Payment.Method.UPI,
+            'note': 'Part 1'
+        })
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.amount_paid, Decimal('40.00'))
+        self.assertEqual(self.invoice.amount_due, Decimal('60.00'))
+        self.assertEqual(self.invoice.status, Invoice.Status.CONFIRMED)
+
+        # Payment 2: $60.00
+        self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
+            'amount': '60.00',
+            'date': '2026-01-12',
+            'method': Payment.Method.CHEQUE,
+            'note': 'Part 2 settlement'
+        })
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.amount_paid, Decimal('100.00'))
+        self.assertEqual(self.invoice.amount_due, Decimal('0.00'))
+        self.assertEqual(self.invoice.status, Invoice.Status.PAID)
+
+    def test_overpayment_rejected(self):
+        """Attempting to pay more than balance due is rejected."""
+        self.client.force_login(self.admin)
+        res = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
+            'amount': '150.00',
+            'date': '2026-01-10',
+            'method': Payment.Method.CARD,
+        }, follow=True)
+        self.assertContains(res, "Overpayment not allowed")
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.amount_paid, Decimal('0.00'))
+
+    def test_zero_and_negative_payment_rejected(self):
+        """Negative and zero payment amounts are rejected."""
+        self.client.force_login(self.admin)
+        # Zero
+        res_zero = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
+            'amount': '0.00',
+            'date': '2026-01-10',
+            'method': Payment.Method.CASH,
+        }, follow=True)
+        self.assertContains(res_zero, "Payment amount must be greater than zero")
+
+        # Negative
+        res_neg = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}), {
+            'amount': '-25.00',
+            'date': '2026-01-10',
+            'method': Payment.Method.CASH,
+        }, follow=True)
+        self.assertContains(res_neg, "Payment amount must be greater than zero")
+
+    def test_payments_only_on_confirmed_invoices(self):
+        """Payments can only be recorded on Confirmed invoices (Draft, Paid, Cancelled rejected)."""
+        self.client.force_login(self.admin)
+
+        # 1. Draft invoice
+        inv_draft = Invoice.objects.create(
+            subscription=self.sub,
+            customer=self.customer,
+            period_start=date(2026, 2, 1),
+            period_end=date(2026, 2, 28),
+            due_date=date(2026, 2, 15),
+            status=Invoice.Status.DRAFT,
+            grand_total=Decimal('50.00')
+        )
+        res_draft = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': inv_draft.pk}), {
+            'amount': '50.00',
+            'date': '2026-02-10',
+            'method': Payment.Method.CARD,
+        }, follow=True)
+        self.assertContains(res_draft, "Payments can only be recorded on Confirmed invoices")
+        self.assertEqual(inv_draft.payments.count(), 0)
+
+        # 2. Cancelled invoice
+        inv_cancelled = Invoice.objects.create(
+            subscription=self.sub,
+            customer=self.customer,
+            period_start=date(2026, 3, 1),
+            period_end=date(2026, 3, 31),
+            due_date=date(2026, 3, 15),
+            status=Invoice.Status.CANCELLED,
+            grand_total=Decimal('50.00')
+        )
+        res_cancelled = self.client.post(reverse('invoicing:payment_create', kwargs={'pk': inv_cancelled.pk}), {
+            'amount': '50.00',
+            'date': '2026-03-10',
+            'method': Payment.Method.CARD,
+        }, follow=True)
+        self.assertContains(res_cancelled, "Payments can only be recorded on Confirmed invoices")
+
+
+class OverdueAndStatusFilterTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.staff = User.objects.create_user(
+            email='auditor@example.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.customer = User.objects.create_user(
+            email='debtor@example.com',
+            password='Password@123',
+            role=User.Role.CUSTOMER
+        )
+        self.plan = Plan.objects.create(name="Tier 1", price=Decimal('100.00'))
+        self.sub = Subscription.objects.create(customer=self.customer, plan=self.plan, status=Subscription.Status.ACTIVE)
+
+        today = date.today()
+        # 1. Overdue: due 10 days ago, Confirmed, balance $100
+        self.inv_overdue = Invoice.objects.create(
+            subscription=self.sub,
+            customer=self.customer,
+            period_start=today - timedelta(days=40),
+            period_end=today - timedelta(days=10),
+            issue_date=today - timedelta(days=20),
+            due_date=today - timedelta(days=10),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00')
+        )
+
+        # 2. Outstanding but not overdue: due in 10 days, Confirmed, balance $100
+        self.inv_outstanding = Invoice.objects.create(
+            subscription=self.sub,
+            customer=self.customer,
+            period_start=today,
+            period_end=today + timedelta(days=30),
+            issue_date=today,
+            due_date=today + timedelta(days=10),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00')
+        )
+
+        # 3. Paid (due date was past, but fully paid): not overdue
+        self.inv_paid = Invoice.objects.create(
+            subscription=self.sub,
+            customer=self.customer,
+            period_start=today - timedelta(days=60),
+            period_end=today - timedelta(days=30),
+            issue_date=today - timedelta(days=40),
+            due_date=today - timedelta(days=30),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('80.00')
+        )
+        Payment.objects.create(
+            invoice=self.inv_paid,
+            amount=Decimal('80.00'),
+            date=today - timedelta(days=35),
+            method=Payment.Method.BANK_TRANSFER,
+            recorded_by=self.staff
+        )
+        self.inv_paid.refresh_from_db()
+
+    def test_overdue_logic_and_days_overdue(self):
+        """Verifies is_overdue and days_overdue property logic."""
+        # Unpaid past due invoice IS overdue
+        self.assertTrue(self.inv_overdue.is_overdue)
+        self.assertEqual(self.inv_overdue.days_overdue, 10)
+
+        # Future due invoice is NOT overdue
+        self.assertFalse(self.inv_outstanding.is_overdue)
+        self.assertEqual(self.inv_outstanding.days_overdue, 0)
+
+        # Fully paid invoice past due date is NOT overdue
+        self.assertEqual(self.inv_paid.status, Invoice.Status.PAID)
+        self.assertFalse(self.inv_paid.is_overdue)
+        self.assertEqual(self.inv_paid.days_overdue, 0)
+
+    def test_overdue_invoices_view(self):
+        """Dedicated /invoicing/overdue/ view lists overdue invoices and calculates debt aggregate."""
+        self.client.force_login(self.staff)
+        res = self.client.get(reverse('invoicing:overdue_list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, self.inv_overdue.invoice_number)
+        self.assertContains(res, "10 days")
+        self.assertNotContains(res, self.inv_outstanding.invoice_number)
+        self.assertNotContains(res, self.inv_paid.invoice_number)
+
+    def test_invoice_list_status_filters_paid_outstanding_overdue(self):
+        """Tests status filter options: Paid, Outstanding, Overdue."""
+        self.client.force_login(self.staff)
+
+        # 1. Filter: Paid
+        res_paid = self.client.get(reverse('invoicing:invoice_list'), {'status': 'paid'})
+        self.assertContains(res_paid, self.inv_paid.invoice_number)
+        self.assertNotContains(res_paid, self.inv_overdue.invoice_number)
+        self.assertNotContains(res_paid, self.inv_outstanding.invoice_number)
+
+        # 2. Filter: Outstanding (unpaid balance)
+        res_out = self.client.get(reverse('invoicing:invoice_list'), {'status': 'outstanding'})
+        self.assertContains(res_out, self.inv_overdue.invoice_number)
+        self.assertContains(res_out, self.inv_outstanding.invoice_number)
+        self.assertNotContains(res_out, self.inv_paid.invoice_number)
+
+        # 3. Filter: Overdue
+        res_over = self.client.get(reverse('invoicing:invoice_list'), {'status': 'overdue'})
+        self.assertContains(res_over, self.inv_overdue.invoice_number)
+        self.assertNotContains(res_over, self.inv_outstanding.invoice_number)
+        self.assertNotContains(res_over, self.inv_paid.invoice_number)
+
+    def test_sql_aggregate_prevents_n_plus_one(self):
+        """Verifies that accessing amount_paid/due on with_payment_totals() uses SQL annotations without N+1."""
+        invoices = list(Invoice.objects.with_payment_totals().filter(pk__in=[self.inv_overdue.pk, self.inv_paid.pk]))
+        with self.assertNumQueries(0):
+            for inv in invoices:
+                _ = inv.amount_paid
+                _ = inv.amount_due
+
+
+class PaymentListAndPermissionTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.staff = User.objects.create_user(
+            email='cashier@example.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.alice = User.objects.create_user(
+            email='alice_pay@example.com',
+            password='Password@123',
+            role=User.Role.CUSTOMER
+        )
+        self.bob = User.objects.create_user(
+            email='bob_pay@example.com',
+            password='Password@123',
+            role=User.Role.CUSTOMER
+        )
+        self.plan = Plan.objects.create(name="Standard", price=Decimal('50.00'))
+        self.sub_a = Subscription.objects.create(customer=self.alice, plan=self.plan, status=Subscription.Status.ACTIVE)
+        self.sub_b = Subscription.objects.create(customer=self.bob, plan=self.plan, status=Subscription.Status.ACTIVE)
+
+        self.inv_a = Invoice.objects.create(
+            subscription=self.sub_a, customer=self.alice,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+            due_date=date(2026, 1, 15), status=Invoice.Status.CONFIRMED, grand_total=Decimal('50.00')
+        )
+        self.inv_b = Invoice.objects.create(
+            subscription=self.sub_b, customer=self.bob,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+            due_date=date(2026, 1, 15), status=Invoice.Status.CONFIRMED, grand_total=Decimal('50.00')
+        )
+
+        self.pay_a = Payment.objects.create(
+            invoice=self.inv_a,
+            amount=Decimal('50.00'),
+            date=date(2026, 1, 10),
+            method=Payment.Method.UPI,
+            note='Alice UPI payment',
+            recorded_by=self.staff
+        )
+        self.pay_b = Payment.objects.create(
+            invoice=self.inv_b,
+            amount=Decimal('50.00'),
+            date=date(2026, 2, 10),
+            method=Payment.Method.BANK_TRANSFER,
+            note='Bob Wire Transfer',
+            recorded_by=self.staff
+        )
+
+    def test_customer_sees_only_own_payments(self):
+        """Alice sees only her payment; cannot see Bob's."""
+        self.client.force_login(self.alice)
+        res = self.client.get(reverse('invoicing:payment_list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Alice UPI payment')
+        self.assertNotContains(res, 'Bob Wire Transfer')
+
+    def test_staff_sees_all_payments_and_can_filter_by_method_and_date(self):
+        """Staff sees all payments and can filter by method and date range."""
+        self.client.force_login(self.staff)
+        # All
+        res = self.client.get(reverse('invoicing:payment_list'))
+        self.assertContains(res, 'Alice UPI payment')
+        self.assertContains(res, 'Bob Wire Transfer')
+
+        # Filter method: UPI
+        res_upi = self.client.get(reverse('invoicing:payment_list'), {'method': 'upi'})
+        self.assertContains(res_upi, 'Alice UPI payment')
+        self.assertNotContains(res_upi, 'Bob Wire Transfer')
+
+        # Filter date range: January only
+        res_date = self.client.get(reverse('invoicing:payment_list'), {
+            'start_date': '2026-01-01',
+            'end_date': '2026-01-31'
+        })
+        self.assertContains(res_date, 'Alice UPI payment')
+        self.assertNotContains(res_date, 'Bob Wire Transfer')
+
 
