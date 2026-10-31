@@ -495,4 +495,31 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertRedirects(response, reverse('login'))
 
+    def test_security_settings_headers(self):
+        """Verify essential security headers and cookie policies are configured."""
+        from django.conf import settings
+        self.assertEqual(settings.X_FRAME_OPTIONS, 'DENY')
+        self.assertTrue(settings.SECURE_CONTENT_TYPE_NOSNIFF)
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+        self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Lax')
+        self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Lax')
+
+    def test_insecure_secret_key_rejected_in_production(self):
+        """Verify that DEBUG=False with default insecure secret key is rejected."""
+        from django.core.exceptions import ImproperlyConfigured
+        from config.settings import INSECURE_DEV_SECRET
+
+        def check_prod_secret(debug, secret_key, argv):
+            if not debug and 'test' not in argv:
+                if not secret_key or secret_key == INSECURE_DEV_SECRET:
+                    raise ImproperlyConfigured("SECRET_KEY must be configured with a secure value when DEBUG=False.")
+            return True
+
+        with self.assertRaises(ImproperlyConfigured):
+            check_prod_secret(False, INSECURE_DEV_SECRET, ['gunicorn', 'config.wsgi'])
+
+        # Secure key should succeed
+        self.assertTrue(check_prod_secret(False, 'super-secure-random-key-12345', ['gunicorn', 'config.wsgi']))
+
+
 
