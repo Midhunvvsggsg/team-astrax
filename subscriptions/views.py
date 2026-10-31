@@ -29,7 +29,7 @@ def subscription_list(request):
     status_filter = request.GET.get('status', '').strip()
     customer_filter = request.GET.get('customer', '').strip()
 
-    subscriptions = Subscription.objects.select_related('customer', 'plan', 'created_by').prefetch_related('lines').all()
+    subscriptions = Subscription.objects.select_related('customer', 'plan', 'created_by').prefetch_related('lines__tax', 'lines__product', 'lines__variant').all()
 
     if search_query:
         subscriptions = subscriptions.filter(

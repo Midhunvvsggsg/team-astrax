@@ -105,8 +105,8 @@ class Subscription(models.Model):
         related_name='subscriptions',
         db_index=True,
     )
-    start_date = models.DateField(_('start date'), default=timezone.now)
-    expiry_date = models.DateField(_('expiry date'), null=True, blank=True)
+    start_date = models.DateField(_('start date'), default=timezone.now, db_index=True)
+    expiry_date = models.DateField(_('expiry date'), null=True, blank=True, db_index=True)
     payment_terms = models.CharField(
         _('payment terms'),
         max_length=50,
