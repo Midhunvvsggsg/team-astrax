@@ -138,6 +138,12 @@ Recurring billing engines must never double-bill a customer, even in the event o
 
 ## ⚡ Performance Benchmark (5,000+ Active Subscriptions)
 
+---
+
+## 📦 Contributing
+Please follow the project guidelines in `AGENTS.md` for branching, committing, and PR workflow.
+
+
 Audited via `scripts/measure_performance.py` against a database containing **5,002 subscriptions** and **9,839 invoices**:
 
 | Page View / Route | HTTP Status | Response Time | SQL Queries | Query Count Bound |
