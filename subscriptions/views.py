@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
@@ -143,6 +144,7 @@ def subscription_detail(request, pk):
 
 
 @customer_required
+@require_POST
 def customer_subscription_action(request, pk):
     """
     Executes customer-requested lifecycle actions (pause, resume, renew, close)
@@ -283,6 +285,7 @@ def subscription_delete(request, pk):
     })
 
 @staff_or_admin_required
+@require_POST
 def subscription_transition(request, pk):
     """Execute status transition via POST with validation."""
     sub = get_object_or_404(Subscription, pk=pk)
@@ -307,6 +310,7 @@ def subscription_transition(request, pk):
     return redirect('subscriptions:subscription_detail', pk=sub.pk)
 
 @staff_or_admin_required
+@require_POST
 def subscription_renew(request, pk):
     """Renew subscription (extends expiry date if renewable)."""
     sub = get_object_or_404(Subscription, pk=pk)
@@ -321,6 +325,7 @@ def subscription_renew(request, pk):
     return redirect('subscriptions:subscription_detail', pk=sub.pk)
 
 @staff_or_admin_required
+@require_POST
 def subscription_line_create(request, subscription_pk):
     """Add a product line to subscription."""
     sub = get_object_or_404(Subscription, pk=subscription_pk)
@@ -344,6 +349,7 @@ def subscription_line_create(request, subscription_pk):
     return redirect('subscriptions:subscription_detail', pk=sub.pk)
 
 @staff_or_admin_required
+@require_POST
 def subscription_line_delete(request, pk):
     """Remove a product line from subscription."""
     line = get_object_or_404(SubscriptionLine, pk=pk)
@@ -445,6 +451,7 @@ def template_delete(request, pk):
     })
 
 @admin_required
+@require_POST
 def template_line_create(request, template_pk):
     """Add a product line to quotation template (Admin only)."""
     tmpl = get_object_or_404(QuotationTemplate, pk=template_pk)
@@ -464,6 +471,7 @@ def template_line_create(request, template_pk):
     return redirect('subscriptions:template_detail', pk=tmpl.pk)
 
 @admin_required
+@require_POST
 def template_line_delete(request, pk):
     """Delete a line from quotation template (Admin only)."""
     line = get_object_or_404(QuotationTemplateLine, pk=pk)

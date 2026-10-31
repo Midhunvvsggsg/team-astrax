@@ -362,6 +362,28 @@ class InvoiceStatusTransitionTests(TestCase):
             self.invoice.transition_to(Invoice.Status.PAID)
         self.assertIn("Draft invoice must be Confirmed before being marked Paid", str(ctx.exception))
 
+    def test_invoice_mutation_views_reject_get_with_405(self):
+        """GET request to invoice transition, send, payment create, or run billing must return 405."""
+        staff_user = User.objects.create_user(
+            email='staff_tester@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.client.force_login(staff_user)
+
+        res_trans = self.client.get(reverse('invoicing:invoice_transition', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_trans.status_code, 405)
+
+        res_send = self.client.get(reverse('invoicing:invoice_send', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_send.status_code, 405)
+
+        res_pay = self.client.get(reverse('invoicing:payment_create', kwargs={'pk': self.invoice.pk}))
+        self.assertEqual(res_pay.status_code, 405)
+
+        res_bill = self.client.get(reverse('invoicing:run_billing'))
+        self.assertEqual(res_bill.status_code, 405)
+
+
 
 class InvoiceSendAndPrintTests(TestCase):
     def setUp(self):

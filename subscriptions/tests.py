@@ -371,6 +371,25 @@ class SubscriptionCustomerPermissionIsolationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
 
+    def test_customer_action_and_subscription_mutation_reject_get_with_405(self):
+        """GET requests to customer action or staff transition/renew must return 405."""
+        self.client.force_login(self.customer1)
+        res_action = self.client.get(reverse('subscriptions:customer_action', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_action.status_code, 405)
+
+        staff_user = User.objects.create_user(
+            email='sub_staff_tester@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.client.force_login(staff_user)
+        res_trans = self.client.get(reverse('subscriptions:subscription_transition', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_trans.status_code, 405)
+
+        res_renew = self.client.get(reverse('subscriptions:subscription_renew', kwargs={'pk': self.sub_alice.pk}))
+        self.assertEqual(res_renew.status_code, 405)
+
+
 
 
 class DiscountRulesAndServiceTests(TestCase):
