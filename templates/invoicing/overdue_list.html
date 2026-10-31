@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Overdue Invoices - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-overdue" style="font-size: 0.8rem; font-weight: 700;">Collections & Debt Audit</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Overdue Invoices</h1>
+      <p class="card-subtitle">Invoices where the due date has elapsed and full payment has not been received.</p>
+    </div>
+    <div style="display: flex; gap: var(--space-12); align-items: center;">
+      <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">
+        ← All Invoices
+      </a>
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">
+        💳 Payment History
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary Metric Banners -->
+  <div class="grid-2" style="margin-top: var(--space-20); gap: var(--space-16);">
+    <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); padding: var(--space-16);">
+      <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-danger); letter-spacing: 0.05em;">
+        Total Overdue Debt
+      </div>
+      <div style="font-size: var(--font-size-2xl); font-weight: 800; color: var(--color-danger); margin-top: var(--space-4);">
+        ${{ total_overdue_debt }}
+      </div>
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-4);">
+        Across {{ total_overdue_count }} uncollected invoice{{ total_overdue_count|pluralize }}
+      </div>
+    </div>
+
+    <div style="background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-16);">
+      <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+        Audit As Of
+      </div>
+      <div style="font-size: var(--font-size-2xl); font-weight: 800; color: var(--color-text); margin-top: var(--space-4);">
+        {{ today|date:"F d, Y" }}
+      </div>
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-4);">
+        Real-time SQL aggregate reconciliation
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Filter -->
+  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-20); align-items: center;">
+    <div style="flex: 1; min-width: 260px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by invoice #, customer email, customer name, subscription #...">
+    </div>
+    <button type="submit" class="btn btn-secondary">Search</button>
+    {% if search_query %}
+      <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Customer</th>
+            <th>Subscription</th>
+            <th>Due Date</th>
+            <th>Days Overdue</th>
+            <th>Grand Total</th>
+            <th>Amount Paid</th>
+            <th>Balance Due</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" style="font-weight: 700; color: var(--color-danger);">
+                  {{ inv.invoice_number }}
+                </a>
+              </td>
+              <td>
+                <div><strong>{{ inv.customer.full_name }}</strong></div>
+                <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ inv.customer.email }}</div>
+              </td>
+              <td>
+                <a href="{% url 'subscriptions:subscription_detail' pk=inv.subscription.pk %}" style="font-size: var(--font-size-xs);">
+                  {{ inv.subscription.subscription_number }}
+                </a>
+              </td>
+              <td style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-danger);">
+                {{ inv.due_date|date:"M d, Y" }}
+              </td>
+              <td>
+                <span class="badge badge-overdue" style="font-weight: 700;">
+                  ⚠️ {{ inv.days_overdue }} day{{ inv.days_overdue|pluralize }}
+                </span>
+              </td>
+              <td style="color: var(--color-text-muted); font-size: var(--font-size-xs);">${{ inv.grand_total }}</td>
+              <td style="color: var(--color-success); font-size: var(--font-size-xs);">
+                {% if inv.amount_paid > 0 %}${{ inv.amount_paid }}{% else %}$0.00{% endif %}
+              </td>
+              <td>
+                <strong style="color: var(--color-danger); font-size: var(--font-size-base);">${{ inv.amount_due }}</strong>
+              </td>
+              <td style="text-align: right; white-space: nowrap;">
+                <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem;">
+                  Record Payment
+                </a>
+                <a href="{% url 'invoicing:invoice_print' pk=inv.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" target="_blank">
+                  Print
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🎉</div>
+    <h3 class="empty-state-title">Zero Overdue Invoices</h3>
+    <p class="empty-state-desc">
+      {% if search_query %}
+        No overdue invoices match your search term.
+      {% else %}
+        All customer accounts are completely in good standing. No unpaid invoices are past their payment due date.
+      {% endif %}
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

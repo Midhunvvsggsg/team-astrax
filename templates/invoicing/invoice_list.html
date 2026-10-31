@@ -8,13 +8,22 @@
     <div>
       <span class="badge badge-staff">Finance Operations</span>
       <h1 class="card-title" style="margin-top: var(--space-8);">Recurring Invoices</h1>
-      <p class="card-subtitle">Automated, idempotent recurring billing runs with taxes, discounts, and payment tracking.</p>
+      <p class="card-subtitle">Automated, idempotent recurring billing runs with taxes, discounts, and payment reconciliation.</p>
     </div>
-    <div style="display: flex; gap: var(--space-8); align-items: center;">
+    <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
+      <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary" style="position: relative;">
+        ⚠️ Overdue
+        {% if overdue_count > 0 %}
+          <span class="badge badge-overdue" style="margin-left: 4px; padding: 2px 6px; font-size: 0.7rem;">{{ overdue_count }}</span>
+        {% endif %}
+      </a>
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">
+        💳 Payments
+      </a>
       <!-- Run Billing Form Button -->
       <form action="{% url 'invoicing:run_billing' %}" method="post" style="display: flex; gap: var(--space-8); align-items: center;">
         {% csrf_token %}
-        <input type="date" name="as_of_date" value="{{ today|date:'Y-m-d' }}" class="form-input" style="width: 150px; padding: 6px 12px; font-size: 0.8rem;" title="Target Billing Date">
+        <input type="date" name="as_of_date" value="{{ today|date:'Y-m-d' }}" class="form-input" style="width: 145px; padding: 6px 10px; font-size: 0.8rem;" title="Target Billing Date">
         <button type="submit" class="btn btn-primary" onclick="return confirm('Execute automated recurring billing for all active subscriptions up to the selected date?')">
           ⚡ Run Billing Engine
         </button>
@@ -22,20 +31,41 @@
     </div>
   </div>
 
-  <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
-    <div style="flex: 1; min-width: 220px;">
-      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by invoice #, customer, sub #...">
+  <!-- Quick Status Filter Pills -->
+  <div style="display: flex; gap: var(--space-8); margin-top: var(--space-16); flex-wrap: wrap;">
+    <a href="{% url 'invoicing:invoice_list' %}" class="btn {% if not status_filter or status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      All Invoices
+    </a>
+    <a href="{% url 'invoicing:invoice_list' %}?status=paid" class="btn {% if status_filter == 'paid' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      ✓ Paid
+    </a>
+    <a href="{% url 'invoicing:invoice_list' %}?status=outstanding" class="btn {% if status_filter == 'outstanding' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      ⏳ Outstanding
+    </a>
+    <a href="{% url 'invoicing:invoice_list' %}?status=overdue" class="btn {% if status_filter == 'overdue' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      ⚠️ Overdue {% if overdue_count > 0 %}({{ overdue_count }}){% endif %}
+    </a>
+    <a href="{% url 'invoicing:invoice_list' %}?status=confirmed" class="btn {% if status_filter == 'confirmed' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      Confirmed
+    </a>
+    <a href="{% url 'invoicing:invoice_list' %}?status=draft" class="btn {% if status_filter == 'draft' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
+      Draft
+    </a>
+  </div>
+
+  <!-- Search & Detailed Filters -->
+  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-16); align-items: center;">
+    <div style="flex: 1; min-width: 200px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search invoice #, customer, sub #...">
     </div>
-    <div style="min-width: 140px;">
+    <div style="min-width: 130px;">
       <select name="status" class="form-select">
-        <option value="">All Statuses</option>
         {% for code, label in statuses %}
           <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </div>
-    <div style="min-width: 180px;">
+    <div style="min-width: 170px;">
       <select name="customer" class="form-select">
         <option value="">All Customers</option>
         {% for c in customers %}
@@ -50,10 +80,6 @@
     <div style="display: flex; align-items: center; gap: var(--space-4);">
       <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">To:</label>
       <input type="date" name="end_date" value="{{ end_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
-    </div>
-    <div style="display: flex; align-items: center; gap: var(--space-4);">
-      <input type="checkbox" name="overdue" value="yes" id="id_overdue" {% if overdue_filter == 'yes' %}checked{% endif %}>
-      <label for="id_overdue" style="font-size: var(--font-size-xs); font-weight: 600; cursor: pointer;">Overdue Only</label>
     </div>
     <button type="submit" class="btn btn-secondary">Filter</button>
     {% if search_query or status_filter or customer_filter or overdue_filter or start_date or end_date %}
@@ -77,6 +103,7 @@
             <th>Discount</th>
             <th>Tax</th>
             <th>Grand Total</th>
+            <th>Paid / Due</th>
             <th>Status</th>
             <th style="text-align: right;">Action</th>
           </tr>
@@ -106,7 +133,11 @@
                   {{ inv.due_date|date:"M d, Y" }}
                 </span>
                 {% if inv.is_overdue %}
-                  <span class="badge badge-overdue" style="font-size: 0.65rem;">OVERDUE</span>
+                  <div>
+                    <span class="badge badge-overdue" style="font-size: 0.65rem;">
+                      {{ inv.days_overdue }}d OVERDUE
+                    </span>
+                  </div>
                 {% endif %}
               </td>
               <td style="color: var(--color-text-muted);">${{ inv.subtotal }}</td>
@@ -116,8 +147,15 @@
               <td style="font-size: var(--font-size-xs);">${{ inv.tax_total }}</td>
               <td>
                 <strong style="color: var(--color-primary); font-size: var(--font-size-base);">${{ inv.grand_total }}</strong>
-                {% if inv.amount_paid > 0 and inv.status != 'paid' %}
-                  <div style="font-size: 0.65rem; color: var(--color-success);">Paid: ${{ inv.amount_paid }}</div>
+              </td>
+              <td style="font-size: var(--font-size-xs); white-space: nowrap;">
+                {% if inv.amount_paid > 0 %}
+                  <div style="color: var(--color-success); font-weight: 600;">Paid: ${{ inv.amount_paid }}</div>
+                {% endif %}
+                {% if inv.amount_due > 0 %}
+                  <div style="color: var(--color-danger); font-weight: 600;">Due: ${{ inv.amount_due }}</div>
+                {% else %}
+                  <div style="color: var(--color-success); font-weight: 700;">Settled</div>
                 {% endif %}
               </td>
               <td>

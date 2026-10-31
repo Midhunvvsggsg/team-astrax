@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Payments & Collections - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Financial Transactions</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Payment History</h1>
+      <p class="card-subtitle">
+        {% if user.is_customer %}
+          Review all payments and receipts credited to your subscription accounts.
+        {% else %}
+          Audit trail of customer payments recorded via bank transfer, card, UPI, cheque, and cash.
+        {% endif %}
+      </p>
+    </div>
+    {% if not user.is_customer %}
+      <div style="display: flex; gap: var(--space-8); align-items: center;">
+        <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">
+          🧾 Invoices
+        </a>
+        <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary">
+          ⚠️ Overdue List
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Summary Stats Bar -->
+  <div style="margin-top: var(--space-16); padding: var(--space-12) var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
+    <div>
+      <span style="font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">
+        Total Settled Volume
+      </span>
+      <div style="font-size: var(--font-size-xl); font-weight: 800; color: var(--color-success);">
+        ${{ total_amount }}
+      </div>
+    </div>
+    <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+      Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} transaction{{ page_obj.paginator.count|pluralize }})
+    </div>
+  </div>
+
+  <!-- Search & Filter Form -->
+  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-20); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search invoice #, customer email, note...">
+    </div>
+    <div style="min-width: 150px;">
+      <select name="method" class="form-select">
+        <option value="">All Methods</option>
+        {% for code, label in methods %}
+          <option value="{{ code }}" {% if method_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">From:</label>
+      <input type="date" name="start_date" value="{{ start_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">To:</label>
+      <input type="date" name="end_date" value="{{ end_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or method_filter or start_date or end_date %}
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Ref #</th>
+            <th>Invoice</th>
+            <th>Customer</th>
+            <th>Payment Date</th>
+            <th>Method</th>
+            <th>Amount Paid</th>
+            <th>Recorded By</th>
+            <th>Notes</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in page_obj %}
+            <tr>
+              <td>
+                <span style="font-family: monospace; font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-muted);">
+                  #PAY-{{ p.pk|stringformat:"05d" }}
+                </span>
+              </td>
+              <td>
+                <a href="{% url 'invoicing:invoice_detail' pk=p.invoice.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ p.invoice.invoice_number }}
+                </a>
+              </td>
+              <td>
+                <div><strong>{{ p.invoice.customer.full_name }}</strong></div>
+                <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ p.invoice.customer.email }}</div>
+              </td>
+              <td style="font-size: var(--font-size-xs); white-space: nowrap;">
+                {{ p.date|date:"M d, Y" }}
+              </td>
+              <td>
+                <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--color-primary); font-weight: 600;">
+                  {{ p.get_method_display }}
+                </span>
+              </td>
+              <td>
+                <strong style="color: var(--color-success); font-size: var(--font-size-base);">
+                  +${{ p.amount }}
+                </strong>
+              </td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ p.recorded_by.email|default:"Customer Portal" }}
+              </td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted); max-width: 200px;">
+                {{ p.note|default:"—" }}
+              </td>
+              <td style="text-align: right; white-space: nowrap;">
+                <a href="{% url 'invoicing:invoice_detail' pk=p.invoice.pk %}" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;">
+                  View Invoice
+                </a>
+                <a href="{% url 'invoicing:invoice_print' pk=p.invoice.pk %}" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;" target="_blank">
+                  Receipt
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&method={{ method_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&method={{ method_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">💳</div>
+    <h3 class="empty-state-title">No Payments Recorded</h3>
+    <p class="empty-state-desc">
+      {% if search_query or method_filter or start_date or end_date %}
+        No payments match your selected filter criteria. Try broadening your query.
+      {% else %}
+        No payments have been recorded in the system yet.
+      {% endif %}
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

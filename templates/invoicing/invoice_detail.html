@@ -224,8 +224,8 @@
         <tbody>
           {% for p in payments %}
             <tr>
-              <td>{{ p.payment_date|date:"M d, Y" }}</td>
-              <td><span class="badge">{{ p.get_payment_method_display }}</span></td>
+              <td>{{ p.date|date:"M d, Y" }}</td>
+              <td><span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--color-primary); font-weight: 600;">{{ p.get_method_display }}</span></td>
               <td><strong style="color: var(--color-success);">${{ p.amount }}</strong></td>
               <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
                 {{ p.recorded_by.email|default:"System" }}
@@ -254,11 +254,11 @@
         </div>
         <div>
           <label class="form-label" style="font-size: var(--font-size-xs);">Payment Date *</label>
-          {{ payment_form.payment_date }}
+          {{ payment_form.date }}
         </div>
         <div>
           <label class="form-label" style="font-size: var(--font-size-xs);">Payment Method *</label>
-          {{ payment_form.payment_method }}
+          {{ payment_form.method }}
         </div>
         <div style="flex: 1; min-width: 180px;">
           <label class="form-label" style="font-size: var(--font-size-xs);">Note</label>

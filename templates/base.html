@@ -26,10 +26,12 @@
         {% if user.is_authenticated %}
           {% if user.is_customer %}
             <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions & Invoices</a></li>
+            <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}">My Payments</a></li>
           {% elif user.is_staff_member or user.is_admin %}
             <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Dashboard</a></li>
             <li><a href="{% url 'subscriptions:subscription_list' %}" class="nav-link {% if 'subscription' in request.resolver_match.url_name %}active{% endif %}">Subscriptions</a></li>
-            <li><a href="{% url 'invoicing:invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name %}active{% endif %}">Invoices</a></li>
+            <li><a href="{% url 'invoicing:invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name %}active{% endif %}">Invoices</a></li>
+            <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">Payments</a></li>
             <li><a href="{% url 'subscriptions:template_list' %}" class="nav-link {% if 'template' in request.resolver_match.url_name %}active{% endif %}">Quotes & Templates</a></li>
             <li><a href="{% url 'catalog:product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">Products</a></li>
             <li><a href="{% url 'catalog:plan_list' %}" class="nav-link {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">Plans</a></li>
