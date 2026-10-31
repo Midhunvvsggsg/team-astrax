@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Subscription from Template - Brightloop{% endblock %}
+
+{% block content %}
+<div style="max-width: 580px; margin: 0 auto;">
+  <div style="margin-bottom: var(--space-16);">
+    <a href="{% url 'subscriptions:subscription_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+      ← Cancel
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="badge badge-staff">Quick Quote Generation</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Turn Quote Template into Subscription</h1>
+      <p class="card-subtitle">
+        Automatically pre-fills the plan and product lines from a pre-defined template, sets validity days, and initializes in Quotation status.
+      </p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.template.id_for_label }}">Quotation Template *</label>
+        {{ form.template }}
+        <p class="form-help">Select the template configuration (lines, plan, validity).</p>
+        {% if form.template.errors %}
+          <div class="form-error">{{ form.template.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.customer.id_for_label }}">Customer Account *</label>
+        {{ form.customer }}
+        <p class="form-help">The customer this subscription proposal is prepared for.</p>
+        {% if form.customer.errors %}
+          <div class="form-error">{{ form.customer.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="{{ form.start_date.id_for_label }}">Start Date *</label>
+          {{ form.start_date }}
+          {% if form.start_date.errors %}
+            <div class="form-error">{{ form.start_date.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="{{ form.payment_terms.id_for_label }}">Payment Terms *</label>
+          {{ form.payment_terms }}
+          {% if form.payment_terms.errors %}
+            <div class="form-error">{{ form.payment_terms.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: var(--space-16); margin-top: var(--space-24);">
+        <a href="{% url 'subscriptions:subscription_list' %}" class="btn btn-secondary">
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Generate Quotation
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

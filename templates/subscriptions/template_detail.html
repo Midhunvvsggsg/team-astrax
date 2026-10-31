@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ template.name }} - Quotation Template{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16);">
+  <a href="{% url 'subscriptions:template_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back to Templates
+  </a>
+</div>
+
+<!-- Template Header -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+        <span class="badge" style="background: var(--color-surface-muted);">Quotation Template</span>
+        {% if template.is_active %}
+          <span class="badge badge-customer">Active</span>
+        {% else %}
+          <span class="badge badge-admin">Inactive</span>
+        {% endif %}
+      </div>
+      <h1 class="card-title">{{ template.name }}</h1>
+      <p class="card-subtitle">
+        Plan: <strong>{{ template.plan.name|default:"Not specified" }}</strong> &bull; Validity: <strong>{{ template.validity_days }} days</strong>
+      </p>
+    </div>
+
+    <div style="display: flex; gap: var(--space-8);">
+      <a href="{% url 'subscriptions:subscription_from_template' %}?template={{ template.pk }}" class="btn btn-primary">
+        ⚡ Create Subscription from Template
+      </a>
+      {% if user.is_admin %}
+        <a href="{% url 'subscriptions:template_edit' pk=template.pk %}" class="btn btn-secondary">Edit</a>
+        <a href="{% url 'subscriptions:template_delete' pk=template.pk %}" class="btn btn-danger">Delete</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Template Product Lines -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h2 class="card-title">Pre-configured Product Lines</h2>
+      <p class="card-subtitle">These lines will automatically populate new quotations created from this template</p>
+    </div>
+    <div>
+      <span class="badge" style="background: var(--color-surface-muted);">{{ lines.count }} line item{{ lines.count|pluralize }}</span>
+    </div>
+  </div>
+
+  {% if lines %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Variant Option</th>
+            <th>Default Quantity</th>
+            <th>Default Unit Price</th>
+            <th>Tax</th>
+            {% if user.is_admin %}<th style="text-align: right;">Action</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+            <tr>
+              <td><strong>{{ line.product.name }}</strong></td>
+              <td>
+                {% if line.variant %}
+                  <span class="badge" style="background: var(--color-surface-muted);">
+                    {{ line.variant.attribute }}: {{ line.variant.value }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">Standard</span>
+                {% endif %}
+              </td>
+              <td>{{ line.quantity }}</td>
+              <td>${{ line.unit_price }}</td>
+              <td>{{ line.tax.name|default:"No tax" }}</td>
+              {% if user.is_admin %}
+                <td style="text-align: right;">
+                  <form action="{% url 'subscriptions:template_line_delete' pk=line.pk %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger" style="padding: 2px 6px; font-size: 0.7rem;" onclick="return confirm('Remove line?')">✕</button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📦</div>
+      <h3 class="empty-state-title">No Lines Added Yet</h3>
+      <p class="empty-state-desc">Add product lines below to define what products and quantities are bundled into this quote template.</p>
+    </div>
+  {% endif %}
+
+  <!-- Add Line to Template Form (Admin only) -->
+  {% if user.is_admin and line_form %}
+    <div style="margin-top: var(--space-24); padding-top: var(--space-24); border-top: 1px solid var(--color-border);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-16);">+ Add Line to Template</h3>
+      <form action="{% url 'subscriptions:template_line_create' template_pk=template.pk %}" method="post" style="display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-end;">
+        {% csrf_token %}
+        <div style="flex: 2; min-width: 200px;">
+          <label class="form-label">Product *</label>
+          {{ line_form.product }}
+        </div>
+        <div style="flex: 2; min-width: 160px;">
+          <label class="form-label">Variant (Optional)</label>
+          {{ line_form.variant }}
+        </div>
+        <div style="flex: 1; min-width: 80px;">
+          <label class="form-label">Quantity *</label>
+          {{ line_form.quantity }}
+        </div>
+        <div style="flex: 1; min-width: 100px;">
+          <label class="form-label">Unit Price ($)</label>
+          {{ line_form.unit_price }}
+        </div>
+        <div style="flex: 1.5; min-width: 140px;">
+          <label class="form-label">Tax</label>
+          {{ line_form.tax }}
+        </div>
+        <div>
+          <button type="submit" class="btn btn-primary">+ Add Line</button>
+        </div>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

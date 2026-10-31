@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Quotation Templates - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Sales Architecture</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Quotation Templates</h1>
+      <p class="card-subtitle">Pre-configured bundles of plans, products, variants, and validity windows for fast quoting.</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'subscriptions:template_create' %}" class="btn btn-primary">+ Add Template</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if templates %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Template Name</th>
+            <th>Associated Plan</th>
+            <th>Validity Window</th>
+            <th>Pre-configured Lines</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tmpl in templates %}
+            <tr>
+              <td>
+                <a href="{% url 'subscriptions:template_detail' pk=tmpl.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ tmpl.name }}
+                </a>
+              </td>
+              <td>
+                {% if tmpl.plan %}
+                  <strong>{{ tmpl.plan.name }}</strong> (${{ tmpl.plan.price }}/{{ tmpl.plan.get_billing_period_display }})
+                {% else %}
+                  <span style="color: var(--color-text-muted);">None</span>
+                {% endif %}
+              </td>
+              <td>{{ tmpl.validity_days }} days</td>
+              <td>
+                <span class="badge" style="background: var(--color-surface-muted);">
+                  {{ tmpl.lines.count }} line item{{ tmpl.lines.count|pluralize }}
+                </span>
+              </td>
+              <td>
+                {% if tmpl.is_active %}
+                  <span class="badge badge-customer">Active</span>
+                {% else %}
+                  <span class="badge badge-admin">Inactive</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <a href="{% url 'subscriptions:subscription_from_template' %}?template={{ tmpl.pk }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">⚡ Use Template</a>
+                <a href="{% url 'subscriptions:template_detail' pk=tmpl.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">View</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📑</div>
+    <h3 class="empty-state-title">No Quotation Templates Found</h3>
+    <p class="empty-state-desc">
+      Create quotation templates to standardize popular plan and product bundles for your sales and operations team.
+    </p>
+    {% if user.is_admin %}
+      <a href="{% url 'subscriptions:template_create' %}" class="btn btn-primary">+ Create First Template</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

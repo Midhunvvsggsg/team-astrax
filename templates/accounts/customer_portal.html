@@ -26,14 +26,45 @@
       </div>
     </div>
 
-    <!-- Empty State per Hackathon UI/UX rules -->
-    <div class="empty-state">
-      <div class="empty-state-icon">📋</div>
-      <h3 class="empty-state-title">No Active Subscriptions Yet</h3>
-      <p class="empty-state-desc">
-        You do not have any active subscriptions registered. When our team assigns a subscription or quotation to your account, it will appear here.
-      </p>
-    </div>
+    {% if subscriptions %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Plan</th>
+              <th>Status</th>
+              <th>Start Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sub in subscriptions %}
+              <tr>
+                <td><strong>{{ sub.subscription_number }}</strong></td>
+                <td>{{ sub.plan.name }}</td>
+                <td>
+                  <span class="badge badge-sub-{{ sub.status }}">{{ sub.get_status_display }}</span>
+                </td>
+                <td>{{ sub.start_date|date:"M d, Y" }}</td>
+                <td>
+                  <a href="{% url 'subscriptions:subscription_detail' pk=sub.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">View</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <!-- Empty State per Hackathon UI/UX rules -->
+      <div class="empty-state">
+        <div class="empty-state-icon">📋</div>
+        <h3 class="empty-state-title">No Active Subscriptions Yet</h3>
+        <p class="empty-state-desc">
+          You do not have any active subscriptions registered. When our team assigns a subscription or quotation to your account, it will appear here.
+        </p>
+      </div>
+    {% endif %}
   </div>
 
   <!-- My Invoices Section -->

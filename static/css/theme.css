@@ -510,6 +510,32 @@ a:hover {
   color: #166534;
 }
 
+/* Subscription status badges */
+.badge-sub-draft {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.badge-sub-quotation {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+.badge-sub-confirmed {
+  background-color: #ede9fe;
+  color: #6d28d9;
+}
+.badge-sub-active {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.badge-sub-paused {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+.badge-sub-closed {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
 /* Grid helper */
 .grid-2 {
   display: grid;

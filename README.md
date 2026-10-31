@@ -87,3 +87,14 @@ python manage.py test
 - [x] **Subscription Plans:** Daily, Weekly, Monthly, and Yearly billing periods, minimum seat quantity, date availability windows, and lifecycle flags (`auto_close_on_end`, `closable_early`, `pausable`, `renewable`).
 - [x] **Strict Role Permissions:** Admin-only create/edit/delete; Staff view-only access; Customers blocked.
 - [x] **Performance & UX:** Search, filter, pagination (10 items/page), and database indexes on commonly queried fields.
+
+### Phase 4: Quotations & Subscription Lifecycle Management
+- [x] **Quotation Templates:** Name, associated plan, product lines (product, variant, quantity, unit price, tax), and validity in days.
+- [x] **Quick Turn-to-Subscription:** "Create subscription from template" action automatically pre-fills plan and lines, sets expiry date based on template validity days.
+- [x] **Sequential Unique Identifiers:** Auto-generated human-readable numbers (`SUB-00001`, `SUB-00002`...).
+- [x] **Enforced Status Transitions:** `Draft` > `Quotation` > `Confirmed` > `Active` > `Closed`. Illegal jumps or reopenings of closed subscriptions are blocked with clear messages.
+- [x] **Status Audit History:** Logs who changed status, timestamp, from/to states, and transition notes.
+- [x] **Plan Flag Controls:** Pause (requires `pausable`), renew (requires `renewable`), and early close (requires `closable_early`) enforced strictly in code.
+- [x] **Minimum Quantity Check:** Total seats across subscription lines must meet the plan's minimum quantity before confirmation/activation.
+- [x] **Automated Expiry Closure Command:** `python manage.py close_expired_subscriptions` closes subscriptions past expiry date when `auto_close_on_end` is enabled.
+- [x] **Customer Portal Isolation:** Customers see only their own active and past subscriptions in read-only view.
