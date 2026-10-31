@@ -1,4 +1,3 @@
-from datetime import date
 from decimal import Decimal
 
 from django.contrib import messages
@@ -15,6 +14,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
+from automation.clock import get_today
 from invoicing.dashboard import get_finance_dashboard_context
 from invoicing.models import Invoice, Payment
 
@@ -120,7 +120,7 @@ def customer_portal_view(request):
         .all()
     )
 
-    today = date.today()
+    today = get_today()
     if status_filter == 'paid':
         invoices = invoices.filter(
             Q(status=Invoice.Status.PAID) | Q(annotated_amount_due=Decimal('0.00'))

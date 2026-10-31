@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from django.db import transaction
 
+from automation.clock import get_today
 from subscriptions.models import DiscountRule, Subscription
 from subscriptions.services import get_applicable_discounts
 
@@ -70,7 +71,7 @@ def generate_invoices(as_of_date: date = None) -> Dict[str, Any]:
         dict: {'created': int, 'skipped': int, 'failed': int, 'invoices': list, 'errors': list}
     """
     if as_of_date is None:
-        as_of_date = date.today()
+        as_of_date = get_today()
 
     active_subscriptions = (
         Subscription.objects.filter(status=Subscription.Status.ACTIVE)

@@ -1,6 +1,6 @@
 import random
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.hashers import make_password
@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
+from automation.clock import get_today
 from catalog.models import Plan, Product, ProductVariant, Tax
 from invoicing.models import Invoice, InvoiceLine, Payment
 from invoicing.services import generate_invoices
@@ -58,7 +59,7 @@ class Command(BaseCommand):
                 User.objects.filter(email__contains='@brightloop.com').exclude(is_superuser=True).delete()
             self.stdout.write(self.style.SUCCESS("Purge complete."))
 
-        today = date.today()
+        today = get_today()
 
         # ---------------------------------------------------------------------
         # 1. Staff and Admin Accounts

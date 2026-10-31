@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -7,6 +7,8 @@ from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from automation.clock import get_today
 
 
 class QuotationTemplate(models.Model):
@@ -182,7 +184,7 @@ class Subscription(models.Model):
     @property
     def is_expired(self):
         if self.expiry_date:
-            return date.today() > self.expiry_date
+            return get_today() > self.expiry_date
         return False
 
     @property
@@ -232,7 +234,7 @@ class Subscription(models.Model):
         Returns (is_valid: bool, error_message: str).
         """
         curr = self.status
-        today = date.today()
+        today = get_today()
 
         # Same status -> no-op
         if curr == new_status:
@@ -330,7 +332,7 @@ class Subscription(models.Model):
             days = 30
 
         if base_date is None:
-            calc_base = max(self.expiry_date or date.today(), date.today())
+            calc_base = max(self.expiry_date or get_today(), get_today())
         else:
             calc_base = max(self.expiry_date or base_date, base_date)
 
@@ -493,7 +495,7 @@ class DiscountRule(models.Model):
     @property
     def is_expired(self):
         if self.end_date:
-            return date.today() > self.end_date
+            return get_today() > self.end_date
         return False
 
     @property

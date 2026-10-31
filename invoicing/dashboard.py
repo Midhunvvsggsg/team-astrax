@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.core.paginator import Paginator
@@ -7,6 +7,7 @@ from django.db.models import Case, Count, DecimalField, F, Sum, Value, When
 from django.db.models.functions import Coalesce, TruncMonth
 
 from accounts.models import User
+from automation.clock import get_today
 from catalog.models import Plan
 from invoicing.models import Invoice, Payment
 from subscriptions.models import Subscription
@@ -17,7 +18,7 @@ def get_finance_dashboard_context(request):
     Computes all finance metrics using pure SQL aggregates (no Python loops),
     prepares chart datasets, and paginates overdue invoices and recent payments.
     """
-    today = date.today()
+    today = get_today()
 
     # Parse GET filters
     start_date_str = request.GET.get('start_date', '').strip()

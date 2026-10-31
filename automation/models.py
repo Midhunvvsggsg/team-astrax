@@ -109,3 +109,27 @@ class Reminder(models.Model):
     def __str__(self):
         target = self.subscription.subscription_number if self.subscription else (self.invoice.invoice_number if self.invoice else "System")
         return f"{self.get_reminder_type_display()} for {target} to {self.recipient.email} on {self.sent_at.strftime('%Y-%m-%d')}"
+
+
+class DemoClock(models.Model):
+    """
+    Singleton model to persist the simulated demo date across processes
+    when DEMO_MODE=1.
+    """
+    simulated_date = models.DateField(_('simulated date'), null=True, blank=True)
+    is_active = models.BooleanField(_('is active'), default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _('demo clock')
+        verbose_name_plural = _('demo clock')
+
+    def __str__(self):
+        state = "Active" if self.is_active else "Inactive"
+        return f"Demo Clock ({state}): {self.simulated_date}"
+
+    @classmethod
+    def get_instance(cls):
+        obj, _ = cls.objects.get_or_create(id=1)
+        return obj
+

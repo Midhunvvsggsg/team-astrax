@@ -68,6 +68,77 @@
     </div>
   </header>
 
+  <!-- Demo Clock Banner & Admin Controls -->
+  {% if demo_clock.enabled %}
+    {% if demo_clock.is_active or user.is_admin %}
+      <div id="demo-clock-banner" style="background: {% if demo_clock.is_active %}#fffbeb; border-bottom: 2px solid #f59e0b; color: #78350f;{% else %}#f8fafc; border-bottom: 1px solid #cbd5e1; color: #334155;{% endif %} padding: 8px 16px; font-size: 13px; z-index: 999; position: sticky; top: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">⏱️</span>
+            {% if demo_clock.is_active %}
+              <strong style="font-weight: 800; letter-spacing: 0.5px; color: #b45309;">DEMO CLOCK: {{ demo_clock.current_date|date:"Y-m-d" }}</strong>
+              <span class="badge" style="background: #f59e0b; color: #fff; font-size: 10px; padding: 2px 6px; text-transform: uppercase; font-weight: 700;">Simulated</span>
+            {% else %}
+              <span style="font-weight: 600;">Demo Clock: <span style="color: var(--color-text-muted);">Real Time ({{ demo_clock.real_date|date:"Y-m-d" }})</span></span>
+            {% endif %}
+          </div>
+
+          {% if user.is_authenticated and user.is_admin %}
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+              <!-- Quick advance buttons -->
+              <form action="{% url 'automation:clock_advance' %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="amount" value="1_day">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1; color: #1e293b;" title="Advance 1 day">+1 Day</button>
+              </form>
+              <form action="{% url 'automation:clock_advance' %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="amount" value="1_week">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1; color: #1e293b;" title="Advance 1 week">+1 Week</button>
+              </form>
+              <form action="{% url 'automation:clock_advance' %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="amount" value="1_month">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1; color: #1e293b;" title="Advance 1 month">+1 Month</button>
+              </form>
+
+              <!-- Set custom date -->
+              <form action="{% url 'automation:clock_set' %}" method="post" style="display: inline-flex; align-items: center; gap: 4px;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input type="date" name="target_date" value="{{ demo_clock.current_date|date:'Y-m-d' }}" style="padding: 2px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; height: 24px;" required>
+                <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1; color: #1e293b;">Set Date</button>
+              </form>
+
+              <!-- Run daily jobs button -->
+              <form action="{% url 'automation:clock_run_jobs' %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-primary" style="padding: 2px 10px; font-size: 11px; background: #0284c7; border: none; color: #fff; font-weight: 600;" onclick="return confirm('Run all daily automated jobs for simulated date {{ demo_clock.current_date|date:'Y-m-d' }}?');">⚡ Run daily jobs</button>
+              </form>
+
+              <!-- Reset button -->
+              {% if demo_clock.is_active %}
+                <form action="{% url 'automation:clock_reset' %}" method="post" style="display: inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; font-weight: 700;">Reset</button>
+                </form>
+              {% endif %}
+            </div>
+          {% elif demo_clock.is_active %}
+            <div>
+              <span style="font-size: 11px; color: #92400e; font-weight: 500;">Simulated Demo Environment (Admin Controlled)</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
   <!-- Flash Messages -->
   <main class="main-content">
     <div class="container">

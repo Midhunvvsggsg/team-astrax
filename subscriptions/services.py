@@ -3,6 +3,8 @@ from datetime import date
 from decimal import Decimal
 from typing import List
 
+from automation.clock import get_today
+
 from .models import DiscountRule, Subscription
 
 
@@ -49,7 +51,7 @@ def get_applicable_discounts(subscription: Subscription, billing_date: date = No
     Returns a list of ApplicableDiscount objects.
     """
     if billing_date is None:
-        billing_date = date.today()
+        billing_date = get_today()
 
     active_rules = (
         DiscountRule.objects.filter(is_active=True)

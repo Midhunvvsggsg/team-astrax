@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from django.conf import settings
@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import staff_or_admin_required
 from accounts.models import User
+from automation.clock import get_today
 
 from .dashboard import get_finance_dashboard_context
 from .forms import PaymentForm
@@ -41,7 +42,7 @@ def invoice_list(request):
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
 
-    today = date.today()
+    today = get_today()
 
     # Base queryset with SQL aggregate payment totals (prevents N+1 queries)
     invoices = Invoice.objects.select_related('customer', 'subscription__plan').with_payment_totals()
@@ -134,7 +135,7 @@ def overdue_invoices(request):
     Dedicated view displaying overdue invoices with days overdue and debt aggregates.
     Overdue = due date passed AND not fully paid.
     """
-    today = date.today()
+    today = get_today()
     search_query = request.GET.get('q', '').strip()
 
     invoices = (
@@ -303,7 +304,7 @@ def invoice_transition(request, pk):
                 Payment.objects.create(
                     invoice=invoice,
                     amount=invoice.amount_due,
-                    date=date.today(),
+                    date=get_today(),
                     method=Payment.Method.BANK_TRANSFER,
                     note=f"Full settlement payment recorded via 'Mark as Paid' by {request.user.email}",
                     recorded_by=request.user,
@@ -413,9 +414,9 @@ def run_billing(request):
             try:
                 as_of_date = datetime.strptime(as_of_str, '%Y-%m-%d').date()
             except ValueError:
-                as_of_date = date.today()
+                as_of_date = get_today()
         else:
-            as_of_date = date.today()
+            as_of_date = get_today()
 
         results = generate_invoices(as_of_date=as_of_date)
 

@@ -1,8 +1,9 @@
 from decimal import Decimal
 
 from django import forms
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from automation.clock import get_today
 
 from .models import Invoice, Payment
 
@@ -24,7 +25,7 @@ class PaymentForm(forms.ModelForm):
         if invoice and not self.initial.get('amount'):
             self.initial['amount'] = invoice.amount_due
         if not self.initial.get('date'):
-            self.initial['date'] = timezone.now().date()
+            self.initial['date'] = get_today()
 
     def clean(self):
         cleaned_data = super().clean()

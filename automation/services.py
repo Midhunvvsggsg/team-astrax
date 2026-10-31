@@ -13,6 +13,7 @@ from invoicing.models import Invoice
 from invoicing.services import generate_invoices
 from subscriptions.models import Subscription, SubscriptionStatusHistory
 
+from .clock import get_today
 from .models import AutomationRun, Reminder
 
 
@@ -32,7 +33,7 @@ def execute_daily_jobs(
     is recorded in errors and does NOT stop the remaining steps.
     """
     if as_of_date is None:
-        as_of_date = date.today()
+        as_of_date = get_today()
 
     start_time = time.time()
     errors = []

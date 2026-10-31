@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from django.core.management.base import BaseCommand
 
+from automation.clock import get_today
 from automation.models import AutomationRun
 from automation.services import execute_daily_jobs
 
@@ -38,7 +39,7 @@ class Command(BaseCommand):
                 self.stderr.write(self.style.ERROR(f"Invalid date format: {date_str}. Expected YYYY-MM-DD."))
                 return
         else:
-            as_of_date = date.today()
+            as_of_date = get_today()
 
         trigger = options.get('trigger', AutomationRun.Trigger.SCHEDULED)
 

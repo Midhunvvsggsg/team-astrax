@@ -187,17 +187,25 @@ System administrators have full operational visibility and on-demand control:
   python manage.py run_daily_jobs --date=YYYY-MM-DD --trigger=manual
   ```
 
+### ⏱️ Admin-Only Demo Clock (`DEMO_MODE=1`)
+For presentations, live judge walkthroughs, and end-to-end temporal verification without waiting for calendar days to pass:
+- **Activation:** Set `DEMO_MODE=1` in your `.env` or run with `DEMO_MODE=1 python manage.py runserver`. When unset or `DEMO_MODE=0`, the clock is completely hidden, disabled, and endpoints reject requests with `403 Forbidden`.
+- **Centralized Temporal Authority:** All business date evaluations (billing runs, auto-renewals, subscription expirations, dunning reminders, overdue calculations, and finance dashboards) route through [`get_today()`](file:///home/midhun/team-astrax/automation/clock.py).
+- **Sticky Banner Across Every Page:** When a simulated date is active, a prominent banner **`DEMO CLOCK: <YYYY-MM-DD>`** displays at the top of every screen with a **Reset** button to instantly restore real-world time.
+- **Admin Control Strip:** Administrators can advance the business date by **+1 Day**, **+1 Week**, **+1 Month**, set an arbitrary date picker target, and immediately execute **⚡ Run Daily Jobs** against the simulated date.
+- **Complete Isolation:** Zero performance overhead or behavioral deviation in production when `DEMO_MODE` is disabled.
+
 ---
 
 ## 🧪 Automated Test Suite
 
-The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, automated operations, and security isolation:
+The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, automated operations, demo clock simulation, and security isolation:
 
 ```bash
 python manage.py test
 ```
 ```text
-Ran 141 tests in 56.062s - OK (141/141 passing)
+Ran 146 tests in 58.807s - OK (146/146 passing)
 ```
 
 ---

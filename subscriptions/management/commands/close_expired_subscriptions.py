@@ -1,7 +1,7 @@
-from datetime import date
 
 from django.core.management.base import BaseCommand
 
+from automation.clock import get_today
 from subscriptions.models import Subscription
 
 
@@ -9,7 +9,7 @@ class Command(BaseCommand):
     help = "Closes active subscriptions that have passed their expiry date and have plan.auto_close_on_end enabled."
 
     def handle(self, *args, **options):
-        today = date.today()
+        today = get_today()
         expired_subs = Subscription.objects.filter(
             status__in=[Subscription.Status.ACTIVE, Subscription.Status.PAUSED],
             plan__auto_close_on_end=True,

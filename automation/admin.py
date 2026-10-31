@@ -3,7 +3,7 @@ from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .models import AutomationRun, Reminder
+from .models import AutomationRun, DemoClock, Reminder
 from .services import execute_daily_jobs
 
 
@@ -125,3 +125,10 @@ class ReminderAdmin(admin.ModelAdmin):
             return f"Invoice {obj.invoice.invoice_number}"
         return "System"
     target_object.short_description = 'Target Record'
+
+
+@admin.register(DemoClock)
+class DemoClockAdmin(admin.ModelAdmin):
+    list_display = ('id', 'simulated_date', 'is_active', 'updated_at')
+    readonly_fields = ('updated_at',)
+

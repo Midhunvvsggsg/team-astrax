@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from django.core.management.base import BaseCommand
 
+from automation.clock import get_today
 from invoicing.services import generate_invoices
 
 
@@ -25,7 +26,7 @@ class Command(BaseCommand):
                 self.stderr.write(self.style.ERROR(f"Invalid date format: {as_of_str}. Expected YYYY-MM-DD."))
                 return
         else:
-            as_of_date = date.today()
+            as_of_date = get_today()
 
         self.stdout.write(f"Executing recurring billing run as of {as_of_date}...")
 

@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,6 +15,7 @@ from accounts.decorators import (
     staff_or_admin_required,
 )
 from accounts.models import User
+from automation.clock import get_today
 
 from .forms import (
     CreateFromTemplateForm,
@@ -103,7 +104,7 @@ def subscription_detail(request, pk):
     # Check which actions are available based on current status and plan flags
     available_actions = []
     customer_actions = []
-    today = date.today()
+    today = get_today()
     curr = subscription.status
 
     if request.user.is_staff_member or request.user.is_admin:
