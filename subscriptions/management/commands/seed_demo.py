@@ -1,18 +1,19 @@
 import random
-from datetime import date, datetime, timedelta
-from decimal import Decimal
 import time
+from datetime import date, timedelta
+from decimal import Decimal
 
-from django.core.management.base import BaseCommand
 from django.contrib.auth.hashers import make_password
+from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Tax, Plan
-from subscriptions.models import Subscription, SubscriptionLine, DiscountRule
+from catalog.models import Plan, Product, ProductVariant, Tax
 from invoicing.models import Invoice, InvoiceLine, Payment
 from invoicing.services import generate_invoices
+from subscriptions.models import DiscountRule, Subscription, SubscriptionLine
+
 
 class Command(BaseCommand):
     help = "Seed realistic demo data: ~5,000 subscriptions, 200 customers, invoices, and payments."
@@ -364,7 +365,6 @@ class Command(BaseCommand):
             )
 
             invs_to_create = []
-            inv_lines_to_create = []
             payments_to_create = []
 
             base_inv_id = current_inv_count + 1
@@ -396,7 +396,7 @@ class Command(BaseCommand):
 
                 # Calculate lines subtotal & taxes
                 sub_lines = list(sub.lines.all())
-                subtotal = sum((l.quantity * l.unit_price for l in sub_lines), Decimal('0.00')) or sub.plan.price
+                subtotal = sum((line_item.quantity * line_item.unit_price for line_item in sub_lines), Decimal('0.00')) or sub.plan.price
                 tax_total = (subtotal * Decimal('0.10')).quantize(Decimal('0.01'))
                 discount_total = (subtotal * Decimal('0.05')).quantize(Decimal('0.01')) if random.random() > 0.7 else Decimal('0.00')
                 grand_total = (subtotal - discount_total + tax_total).quantize(Decimal('0.01'))

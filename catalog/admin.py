@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Product, ProductVariant, Tax, Plan
+
+from .models import Plan, Product, ProductVariant, Tax
+
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant

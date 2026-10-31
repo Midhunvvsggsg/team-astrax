@@ -1,10 +1,12 @@
-from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from accounts.decorators import staff_or_admin_required, admin_required
-from .models import Product, ProductVariant, Tax, Plan
-from .forms import ProductForm, ProductVariantForm, TaxForm, PlanForm
+from django.shortcuts import get_object_or_404, redirect, render
+
+from accounts.decorators import admin_required, staff_or_admin_required
+
+from .forms import PlanForm, ProductForm, ProductVariantForm, TaxForm
+from .models import Plan, Product, ProductVariant, Tax
 
 # ==============================================================================
 # Products & Variants Views

@@ -1,20 +1,23 @@
-from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
-from django.urls import reverse
+from decimal import Decimal
+from io import StringIO
+
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from io import StringIO
+from django.test import Client, TestCase
+from django.urls import reverse
+
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Tax, Plan
+from catalog.models import Plan, Product, Tax
+
 from .models import (
+    DiscountRule,
     QuotationTemplate,
     QuotationTemplateLine,
     Subscription,
     SubscriptionLine,
-    SubscriptionStatusHistory,
-    DiscountRule,
 )
+
 
 class SubscriptionLifecycleAndTransitionsTests(TestCase):
     def setUp(self):
@@ -483,6 +486,7 @@ class DiscountRulesAndServiceTests(TestCase):
         )
         discounts = get_applicable_discounts(self.sub, billing_date=date.today())
         self.assertEqual(len(discounts), 1)
+        self.assertEqual(discounts[0].rule, rule)
         # Should be capped at $250.00 (the eligible amount) so line/total is never negative
         self.assertEqual(discounts[0].calculated_amount, Decimal('250.00'))
 
@@ -693,8 +697,8 @@ class QueryCountAndSeedTests(TestCase):
 
     def test_subscriptions_list_query_count_is_bounded_and_no_n_plus_one(self):
         """Verify subscription list uses prefetch and select_related, bounding queries <= 10."""
-        from django.test.utils import CaptureQueriesContext
         from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
         self.client.force_login(self.admin)
         with CaptureQueriesContext(connection) as ctx:
@@ -706,8 +710,8 @@ class QueryCountAndSeedTests(TestCase):
 
     def test_customer_portal_query_count_is_bounded(self):
         """Verify customer portal page bounds query count and prevents N+1 payment calculations."""
-        from django.test.utils import CaptureQueriesContext
         from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
         self.client.force_login(self.customer)
         with CaptureQueriesContext(connection) as ctx:

@@ -1,23 +1,36 @@
 from datetime import date, timedelta
-from django.shortcuts import render, redirect, get_object_or_404
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.core.exceptions import ValidationError, PermissionDenied
-from django.db.models import Q
 from django.db import transaction
-from accounts.decorators import staff_or_admin_required, admin_required, customer_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
+
+from accounts.decorators import (
+    admin_required,
+    customer_required,
+    staff_or_admin_required,
+)
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Plan
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory, DiscountRule
+
 from .forms import (
+    CreateFromTemplateForm,
+    DiscountRuleForm,
     QuotationTemplateForm,
     QuotationTemplateLineForm,
     SubscriptionForm,
     SubscriptionLineForm,
-    CreateFromTemplateForm,
-    DiscountRuleForm,
+)
+from .models import (
+    DiscountRule,
+    QuotationTemplate,
+    QuotationTemplateLine,
+    Subscription,
+    SubscriptionLine,
+    SubscriptionStatusHistory,
 )
 
 # ==============================================================================
@@ -157,7 +170,6 @@ def customer_subscription_action(request, pk):
     )
     if request.method == 'POST':
         action = request.POST.get('action', '').strip().lower()
-        today = date.today()
 
         if action == 'pause':
             if not subscription.plan.pausable:

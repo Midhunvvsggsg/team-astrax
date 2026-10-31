@@ -1,9 +1,11 @@
-from django.test import TestCase, Client
-from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.test import Client, TestCase
+from django.urls import reverse
+
+from accounts.forms import CustomerSignupForm
 from accounts.models import User
 from accounts.validators import BrightloopPasswordValidator
-from accounts.forms import CustomerSignupForm, StaffCreationForm
+
 
 class CustomUserModelTests(TestCase):
     def test_create_user_normalizes_and_lowercases_email(self):
@@ -221,11 +223,12 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
         )
 
         # Plans
-        from decimal import Decimal
         from datetime import date, timedelta
+        from decimal import Decimal
+
         from catalog.models import Plan, Product
-        from subscriptions.models import Subscription, SubscriptionLine
         from invoicing.models import Invoice, Payment
+        from subscriptions.models import Subscription, SubscriptionLine
 
         self.plan_pausable = Plan.objects.create(
             name="Pausable & Renewable Plan",
@@ -507,6 +510,7 @@ class CustomerPortalSecurityAndProfileTests(TestCase):
     def test_insecure_secret_key_rejected_in_production(self):
         """Verify that DEBUG=False with default insecure secret key is rejected."""
         from django.core.exceptions import ImproperlyConfigured
+
         from config.settings import INSECURE_DEV_SECRET
 
         def check_prod_secret(debug, secret_key, argv):

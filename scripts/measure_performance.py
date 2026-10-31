@@ -14,14 +14,16 @@ sys.path.insert(0, BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 import django
+
 django.setup()
 
-from django.test import Client
 from django.db import connection
+from django.test import Client
 from django.test.utils import CaptureQueriesContext
+
 from accounts.models import User
-from subscriptions.models import Subscription
 from invoicing.models import Invoice
+from subscriptions.models import Subscription
 
 
 def measure_pages():

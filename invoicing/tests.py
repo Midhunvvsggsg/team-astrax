@@ -1,15 +1,18 @@
-from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.db import IntegrityError
-from django.core.exceptions import ValidationError
+from decimal import Decimal
+
 from django.core import mail
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.test import Client, TestCase
+from django.urls import reverse
+
 from accounts.models import User
-from catalog.models import Product, ProductVariant, Tax, Plan
-from subscriptions.models import Subscription, SubscriptionLine, DiscountRule
-from invoicing.models import Invoice, InvoiceLine, Payment
-from invoicing.services import generate_invoices, advance_period_date, add_months
+from catalog.models import Plan, Product, Tax
+from invoicing.models import Invoice, Payment
+from invoicing.services import advance_period_date, generate_invoices
+from subscriptions.models import DiscountRule, Subscription, SubscriptionLine
+
 
 class InvoiceGenerationServiceTests(TestCase):
     def setUp(self):

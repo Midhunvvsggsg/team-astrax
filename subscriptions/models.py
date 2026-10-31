@@ -1,11 +1,13 @@
-from decimal import Decimal
 from datetime import date, timedelta
+from decimal import Decimal
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils import timezone
-from django.core.validators import MinValueValidator
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.conf import settings
+
 
 class QuotationTemplate(models.Model):
     name = models.CharField(_('template name'), max_length=255, unique=True, db_index=True)
@@ -274,7 +276,7 @@ class Subscription(models.Model):
         if curr == self.Status.PAUSED:
             if new_status in [self.Status.ACTIVE, self.Status.CLOSED]:
                 return True, ""
-            return False, _(f"Paused subscription can only resume to Active or be Closed.")
+            return False, _("Paused subscription can only resume to Active or be Closed.")
 
         # Closed -> No further transitions except renewal
         if curr == self.Status.CLOSED:

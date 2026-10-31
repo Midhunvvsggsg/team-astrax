@@ -1,15 +1,14 @@
 import calendar
 import logging
-from decimal import Decimal
 from datetime import date, timedelta
-from typing import Dict, Any, List
+from decimal import Decimal
+from typing import Any, Dict, List
 
 from django.db import transaction
-from django.utils import timezone
-from django.core.exceptions import ValidationError
 
-from subscriptions.models import Subscription, SubscriptionLine, DiscountRule
+from subscriptions.models import DiscountRule, Subscription
 from subscriptions.services import get_applicable_discounts
+
 from .models import Invoice, InvoiceLine
 
 logger = logging.getLogger(__name__)

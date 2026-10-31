@@ -1,14 +1,16 @@
+import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-import json
-from django.db.models import Sum, Count, Case, When, F, Value, DecimalField
-from django.db.models.functions import Coalesce, TruncMonth
+
 from django.core.paginator import Paginator
+from django.db.models import Case, Count, DecimalField, F, Sum, Value, When
+from django.db.models.functions import Coalesce, TruncMonth
 
 from accounts.models import User
 from catalog.models import Plan
-from subscriptions.models import Subscription
 from invoicing.models import Invoice, Payment
+from subscriptions.models import Subscription
+
 
 def get_finance_dashboard_context(request):
     """
@@ -171,7 +173,7 @@ def get_finance_dashboard_context(request):
     # TABLE 2: Recent Payments
     recent_payments_qs = payments_qs.order_by('-date', '-created_at')
     page_payments = request.GET.get('page_payments', 1)
-    paginator_payments = Paginator(recent_payments_list if 'recent_payments_list' in locals() else recent_payments_qs, 5)
+    paginator_payments = Paginator(recent_payments_qs, 5)
     payments_page_obj = paginator_payments.get_page(page_payments)
 
     # Dropdown choices for filter bar

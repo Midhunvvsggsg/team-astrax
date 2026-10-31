@@ -1,8 +1,9 @@
 from functools import wraps
+
+from django.contrib.auth.mixins import AccessMixin
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
-from django.contrib import messages
-from django.contrib.auth.mixins import AccessMixin
+
 
 def role_required(allowed_roles):
     """
