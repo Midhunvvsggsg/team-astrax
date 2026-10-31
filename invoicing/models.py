@@ -346,3 +346,111 @@ class Payment(models.Model):
                     self.invoice.save(update_fields=['status', 'updated_at'])
 
 
+class BankStatement(models.Model):
+    uploaded_at = models.DateTimeField(_('uploaded at'), auto_now_add=True, db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_bank_statements',
+        verbose_name=_('uploaded by')
+    )
+    filename = models.CharField(_('filename'), max_length=255)
+    total_rows = models.PositiveIntegerField(_('total rows'), default=0)
+    auto_reconciled_count = models.PositiveIntegerField(_('auto-reconciled count'), default=0)
+    needs_review_count = models.PositiveIntegerField(_('needs review count'), default=0)
+    unmatched_count = models.PositiveIntegerField(_('unmatched count'), default=0)
+    duplicate_count = models.PositiveIntegerField(_('duplicate count'), default=0)
+
+    class Meta:
+        verbose_name = _('bank statement')
+        verbose_name_plural = _('bank statements')
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Statement {self.filename} ({self.uploaded_at.strftime('%Y-%m-%d %H:%M')})"
+
+
+class BankStatementRow(models.Model):
+    class Status(models.TextChoices):
+        AUTO_RECONCILED = 'auto_reconciled', _('Auto-Reconciled')
+        NEEDS_REVIEW = 'needs_review', _('Needs Review')
+        MANUALLY_RECONCILED = 'manually_reconciled', _('Manually Reconciled')
+        UNMATCHED = 'unmatched', _('Unmatched')
+        DUPLICATE = 'duplicate', _('Duplicate (Ignored)')
+
+    class Confidence(models.TextChoices):
+        HIGH = 'high', _('High Confidence')
+        MEDIUM = 'medium', _('Medium Confidence')
+        LOW = 'low', _('Low / Unmatched')
+
+    statement = models.ForeignKey(
+        BankStatement,
+        related_name='rows',
+        on_delete=models.CASCADE,
+        verbose_name=_('bank statement')
+    )
+    row_number = models.PositiveIntegerField(_('row number'))
+    date = models.DateField(_('transaction date'), db_index=True)
+    description = models.TextField(_('description'), blank=True)
+    amount = models.DecimalField(
+        _('amount ($)'),
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    reference = models.CharField(_('reference'), max_length=255, blank=True)
+    row_hash = models.CharField(_('row hash (SHA-256)'), max_length=64, db_index=True)
+
+    matched_invoice = models.ForeignKey(
+        Invoice,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reconciliation_rows',
+        verbose_name=_('matched invoice')
+    )
+    payment = models.ForeignKey(
+        Payment,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reconciliation_rows',
+        verbose_name=_('recorded payment')
+    )
+    confidence = models.CharField(
+        _('match confidence'),
+        max_length=20,
+        choices=Confidence.choices,
+        default=Confidence.LOW
+    )
+    status = models.CharField(
+        _('reconciliation status'),
+        max_length=30,
+        choices=Status.choices,
+        default=Status.UNMATCHED,
+        db_index=True
+    )
+    match_reasons = models.TextField(_('match explanation'), blank=True)
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_statement_rows',
+        verbose_name=_('reviewed by')
+    )
+    reviewed_at = models.DateTimeField(_('reviewed at'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('bank statement row')
+        verbose_name_plural = _('bank statement rows')
+        ordering = ['row_number']
+
+    def __str__(self):
+        return f"Row #{self.row_number} - ${self.amount} ({self.get_status_display()})"
+
+
+

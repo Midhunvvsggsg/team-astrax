@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Bank Statement Reconciliation - Brightloop{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16); margin-bottom: var(--space-24);">
+  <div>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol style="list-style: none; display: flex; gap: var(--space-8); padding: 0; margin: 0 0 var(--space-8) 0; font-size: var(--font-size-xs);">
+        <li><a href="{% url 'home' %}">Dashboard</a></li>
+        <li style="color: var(--color-text-muted);">/</li>
+        <li><a href="{% url 'invoicing:invoice_list' %}">Invoices</a></li>
+        <li style="color: var(--color-text-muted);">/</li>
+        <li style="color: var(--color-text-muted);">Bank Reconciliation</li>
+      </ol>
+    </nav>
+    <h1 style="font-size: var(--font-size-2xl); font-weight: 700; margin: 0; color: var(--color-text-main);">
+      Bank Statement Reconciliation
+    </h1>
+    <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin: var(--space-4) 0 0 0;">
+      Upload bank statement CSVs to automatically reconcile incoming wire and transfer payments against confirmed invoices.
+    </p>
+  </div>
+</div>
+
+<!-- Upload CSV Card -->
+<div class="card" style="margin-bottom: var(--space-32); border-left: 4px solid var(--color-primary);">
+  <div style="margin-bottom: var(--space-16);">
+    <h2 class="card-title">Upload Bank Statement (CSV)</h2>
+    <p class="card-subtitle">
+      Expected columns: <code>date</code>, <code>description</code>, <code>amount</code>, <code>reference</code>. Maximum file size: 5 MB.
+    </p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: var(--space-16);">
+    {% csrf_token %}
+    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+      <div style="flex: 1; min-width: 260px;">
+        <label for="statement_file" style="display: block; font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--space-4);">
+          Select Statement File (.CSV)
+        </label>
+        <input
+          type="file"
+          id="statement_file"
+          name="statement_file"
+          accept=".csv,text/csv"
+          required
+          style="width: 100%; padding: var(--space-8); border: 1px solid var(--color-border); border-radius: 4px; background: #fff;"
+        >
+      </div>
+      <div style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary" style="height: 38px;">
+          📤 Upload & Reconcile
+        </button>
+      </div>
+    </div>
+    <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+      💡 <strong>Rule-based matching engine:</strong> Auto-reconciles high confidence rows (invoice number + exact amount), queues partial or fuzzy customer matches for one-click approval, and guarantees idempotency so duplicate transactions are never recorded twice.
+    </div>
+  </form>
+</div>
+
+<!-- Previous Uploads History Table -->
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-16);">
+    <div>
+      <h2 class="card-title">Reconciliation Statement History</h2>
+      <p class="card-subtitle">Past uploaded bank statements and batch reconciliation logs</p>
+    </div>
+    <span class="badge" style="background: var(--color-surface-muted);">{{ total_statements }} Statements</span>
+  </div>
+
+  {% if page_obj %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Statement Filename</th>
+            <th>Uploaded At</th>
+            <th>Uploaded By</th>
+            <th>Total Rows</th>
+            <th>Auto-Reconciled</th>
+            <th>Needs Review</th>
+            <th>Unmatched</th>
+            <th>Duplicates</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in page_obj %}
+            <tr>
+              <td><strong>{{ s.filename }}</strong></td>
+              <td style="font-size: var(--font-size-xs);">{{ s.uploaded_at|date:"Y-m-d H:i" }}</td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ s.uploaded_by.email|default:"System" }}
+              </td>
+              <td>{{ s.total_rows }}</td>
+              <td>
+                <span class="badge badge-active" style="background: #dcfce7; color: #15803d;">
+                  ✓ {{ s.auto_reconciled_count }}
+                </span>
+              </td>
+              <td>
+                {% if s.needs_review_count > 0 %}
+                  <span class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700;">
+                    ⚠️ {{ s.needs_review_count }} review
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">0</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.unmatched_count > 0 %}
+                  <span class="badge" style="background: #fee2e2; color: #b91c1c;">
+                    {{ s.unmatched_count }} unmatched
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">0</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.duplicate_count > 0 %}
+                  <span class="badge" style="background: var(--color-surface-muted);">
+                    {{ s.duplicate_count }} ignored
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">0</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <a href="{% url 'invoicing:reconciliation_detail' pk=s.pk %}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;">
+                  Review &amp; Manage →
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+      <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-16);">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">← Previous</a>
+        {% endif %}
+        <span style="font-size: var(--font-size-sm); align-self: center; color: var(--color-text-muted);">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Next →</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="empty-state" style="padding: var(--space-32);">
+      <p style="color: var(--color-text-muted); margin: 0 0 var(--space-12) 0;">No bank statements have been uploaded yet.</p>
+      <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0;">Upload a CSV above to start reconciling payments.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

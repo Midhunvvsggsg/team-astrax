@@ -18,7 +18,13 @@ from automation.clock import get_today
 
 from .dashboard import get_finance_dashboard_context
 from .forms import PaymentForm
-from .models import Invoice, Payment
+from .models import BankStatement, BankStatementRow, Invoice, Payment
+from .reconciliation import (
+    approve_reconciliation_row,
+    manually_reconcile_row,
+    parse_statement_csv,
+    process_bank_statement,
+)
 from .services import generate_invoices
 
 
@@ -432,3 +438,137 @@ def run_billing(request):
             messages.info(request, msg + " All active subscriptions are already billed.")
 
     return redirect('invoicing:invoice_list')
+
+
+@staff_or_admin_required
+def reconciliation_dashboard(request):
+    """
+    Main bank reconciliation hub:
+    - Lists previous uploaded statements with reconciliation metrics.
+    - Provides CSV upload form with file type and size validation.
+    """
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('statement_file')
+        if not uploaded_file:
+            messages.error(request, "Please select a bank statement CSV file to upload.")
+            return redirect('invoicing:reconciliation_dashboard')
+
+        # Validate file extension
+        if not uploaded_file.name.lower().endswith('.csv'):
+            messages.error(request, "Invalid file format. Only .CSV files are accepted for bank reconciliation.")
+            return redirect('invoicing:reconciliation_dashboard')
+
+        # Parse CSV
+        raw_rows, parse_errors = parse_statement_csv(uploaded_file)
+        if parse_errors:
+            for err in parse_errors:
+                messages.error(request, err)
+            return redirect('invoicing:reconciliation_dashboard')
+
+        # Create statement container and process
+        statement = BankStatement.objects.create(
+            filename=uploaded_file.name,
+            uploaded_by=request.user,
+        )
+        process_bank_statement(statement, raw_rows, user=request.user)
+
+        messages.success(
+            request,
+            f"Statement '{statement.filename}' processed: "
+            f"{statement.auto_reconciled_count} auto-reconciled, "
+            f"{statement.needs_review_count} awaiting review, "
+            f"{statement.unmatched_count} unmatched, "
+            f"{statement.duplicate_count} duplicate(s) ignored."
+        )
+        return redirect('invoicing:reconciliation_detail', pk=statement.pk)
+
+    statements = BankStatement.objects.select_related('uploaded_by').all()
+    paginator = Paginator(statements, 15)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'invoicing/reconciliation_dashboard.html', {
+        'page_obj': page_obj,
+        'total_statements': statements.count(),
+    })
+
+
+@staff_or_admin_required
+def reconciliation_detail(request, pk):
+    """
+    Detailed review screen for an uploaded bank statement:
+    - Lists Medium confidence rows with one-click approval.
+    - Lists Unmatched rows with manual invoice assignment.
+    - Lists Auto-reconciled and Duplicate rows for audit.
+    """
+    statement = get_object_or_404(BankStatement.objects.select_related('uploaded_by'), pk=pk)
+
+    rows = statement.rows.select_related(
+        'matched_invoice__customer',
+        'payment',
+        'reviewed_by',
+    ).all()
+
+    needs_review_rows = [r for r in rows if r.status == BankStatementRow.Status.NEEDS_REVIEW]
+    unmatched_rows = [r for r in rows if r.status == BankStatementRow.Status.UNMATCHED]
+    auto_reconciled_rows = [r for r in rows if r.status == BankStatementRow.Status.AUTO_RECONCILED]
+    manual_reconciled_rows = [r for r in rows if r.status == BankStatementRow.Status.MANUALLY_RECONCILED]
+    duplicate_rows = [r for r in rows if r.status == BankStatementRow.Status.DUPLICATE]
+
+    # Confirmed unpaid invoices for manual mapping dropdown
+    unpaid_invoices = (
+        Invoice.objects
+        .filter(status=Invoice.Status.CONFIRMED)
+        .select_related('customer')
+        .order_by('invoice_number')
+    )
+
+    return render(request, 'invoicing/reconciliation_detail.html', {
+        'statement': statement,
+        'needs_review_rows': needs_review_rows,
+        'unmatched_rows': unmatched_rows,
+        'auto_reconciled_rows': auto_reconciled_rows,
+        'manual_reconciled_rows': manual_reconciled_rows,
+        'duplicate_rows': duplicate_rows,
+        'unpaid_invoices': unpaid_invoices,
+    })
+
+
+@staff_or_admin_required
+@require_POST
+def reconciliation_row_approve(request, row_pk):
+    """One-click approval for a medium-confidence reconciliation row."""
+    row = get_object_or_404(BankStatementRow.objects.select_related('statement', 'matched_invoice'), pk=row_pk)
+    try:
+        payment = approve_reconciliation_row(row, user=request.user)
+        messages.success(
+            request,
+            f"Row #{row.row_number} approved! Payment of ${payment.amount} recorded for {row.matched_invoice.invoice_number}."
+        )
+    except ValidationError as e:
+        messages.error(request, str(e.message if hasattr(e, 'message') else e))
+
+    return redirect('invoicing:reconciliation_detail', pk=row.statement_id)
+
+
+@staff_or_admin_required
+@require_POST
+def reconciliation_row_manual(request, row_pk):
+    """Manually maps an unmatched row to a selected invoice."""
+    row = get_object_or_404(BankStatementRow.objects.select_related('statement'), pk=row_pk)
+    invoice_id = request.POST.get('invoice_id')
+    if not invoice_id:
+        messages.error(request, "Please select an invoice to reconcile.")
+        return redirect('invoicing:reconciliation_detail', pk=row.statement_id)
+
+    invoice = get_object_or_404(Invoice, pk=invoice_id)
+    try:
+        payment = manually_reconcile_row(row, invoice=invoice, user=request.user)
+        messages.success(
+            request,
+            f"Row #{row.row_number} manually reconciled with {invoice.invoice_number} (${payment.amount} recorded)."
+        )
+    except ValidationError as e:
+        messages.error(request, str(e.message if hasattr(e, 'message') else e))
+
+    return redirect('invoicing:reconciliation_detail', pk=row.statement_id)
+

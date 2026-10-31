@@ -1,0 +1,7 @@
+date,description,amount,reference
+2026-10-15,Payment for Brightloop Services,100.00,INV-00001 Acme Corp
+2026-10-16,Wire Transfer Settlement,250.00,INV-00002 Global Tech
+2026-10-17,Partial deposit towards balance,50.00,INV-00003
+2026-10-18,Subscription renewal payment,100.00,Acme Corp direct wire
+2026-10-19,Vendor refund from Hardware Corp,45.00,REF-998822 Miscellaneous
+2026-10-15,Payment for Brightloop Services,100.00,INV-00001 Acme Corp

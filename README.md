@@ -61,7 +61,7 @@ Open your browser at: **`http://127.0.0.1:8000/`**
 | **3. Turning a quote into a subscription** | [`subscriptions/views.py`](file:///home/midhun/team-astrax/subscriptions/views.py) | • Quotation templates prefilled with plan, product lines, and validity in days.<br>• "Create subscription from template" action calculates expiry and initializes quote.<br>• Auto-generated human-readable sequential IDs (`SUB-00001`).<br>• Enforced lifecycle state machine: `Draft` → `Quotation` → `Confirmed` → `Active` → `Closed`.<br>• Full status audit timeline tracking user, timestamp, transitions, and notes. |
 | **4. Billing day** | [`invoicing/services.py`](file:///home/midhun/team-astrax/invoicing/services.py) | • Automated recurring billing engine with catch-up for missed historical periods.<br>• **Guaranteed Idempotency:** DB unique constraint on `(subscription, period_start)` prevents duplicate billing.<br>• Pre-fills customer details, line items, automatic tax calculations, and applied discounts.<br>• Invoice state machine: `Draft` → `Confirmed` → `Paid` (with cancellation guards for unpaid invoices).<br>• Print-ready media CSS layout for paper/PDF export. |
 | **5. A customer asks for a better price** | [`subscriptions/services.py`](file:///home/midhun/team-astrax/subscriptions/services.py) | • Admin-managed discount rules: fixed amount or percentage rates.<br>• Conditions: minimum purchase amount, minimum seats, date windows, usage limits.<br>• Scopes: applies to specific products or whole subscriptions.<br>• Automatically applies to invoices during billing runs, increments usage counter, and caps discounts so invoices are never negative. |
-| **6. The money comes in** | [`invoicing/views.py`](file:///home/midhun/team-astrax/invoicing/views.py) | • Multi-method payments: Cash, Bank Transfer, Card, UPI, Cheque.<br>• Itemized payment recording with method, amount, date, and transaction reference note.<br>• Supports partial payments; invoice automatically transitions to `Paid` only when payments cover the grand total.<br>• Rejects overpayment and negative amounts. Real-time overdue invoice tracking (`due_date < today` and unpaid balance). |
+| **6. The money comes in** | [`invoicing/views.py`](file:///home/midhun/team-astrax/invoicing/views.py) | • Multi-method payments: Cash, Bank Transfer, Card, UPI, Cheque.<br>• Itemized payment recording with method, amount, date, and transaction reference note.<br>• Supports partial payments; invoice automatically transitions to `Paid` only when payments cover the grand total.<br>• **Bank Statement Reconciliation**: Upload CSV statements; rule-based matching (invoice #, exact amount, customer similarity) auto-records high-confidence payments; review screen for one-click partial/medium approval; cryptographic row hashing prevents duplicate payments. |
 | **7. The finance lead at month end** | [`invoicing/dashboard.py`](file:///home/midhun/team-astrax/invoicing/dashboard.py) | • Executive Finance Intelligence Dashboard: MRR, ARR, Active Subscriptions, Total Revenue Collected, Outstanding Debt, and Overdue Count.<br>• Calculated entirely via database SQL aggregations (`Sum`, `Count`, `Case/When`, `Coalesce`) — zero N+1 queries.<br>• Bundled offline charts with sub-second response times across 5,000+ active records. |
 
 ---
@@ -195,17 +195,27 @@ For presentations, live judge walkthroughs, and end-to-end temporal verification
 - **Admin Control Strip:** Administrators can advance the business date by **+1 Day**, **+1 Week**, **+1 Month**, set an arbitrary date picker target, and immediately execute **⚡ Run Daily Jobs** against the simulated date.
 - **Complete Isolation:** Zero performance overhead or behavioral deviation in production when `DEMO_MODE` is disabled.
 
+### 🏦 Bank Statement Reconciliation
+Brightloop automates incoming wire and bank settlement reconciliation using an offline, rule-based matching engine:
+- **CSV Ingestion:** Staff upload standard CSV statements (`date`, `description`, `amount`, `reference`). Validates file type (`.csv`) and enforces a 5MB size limit.
+- **Rule-Based Matching Tiers:** Matches against confirmed unpaid invoices:
+  1. **High Confidence (Auto-Reconciled):** Exact invoice number in reference + exact amount match (and customer confirmation). Automatically records payments through the payment engine and marks fully settled invoices as `Paid`.
+  2. **Medium Confidence (One-Click Approval):** Partial payments against matched invoices, or customer-name similarity matches without explicit invoice numbers. Placed on an intuitive review screen for instant one-click approval.
+  3. **Unmatched (Manual Assignment):** Listed with a dropdown selector of unpaid invoices for staff to assign and reconcile manually.
+- **Cryptographic Row Idempotency:** Every row computes a deterministic SHA-256 hash (`date|amount|ref|desc`). Even if the statement is uploaded multiple times, previously applied transactions are marked as `Duplicate (Ignored)`, mathematically preventing double payments.
+- **Sample File Provided:** See [`docs/sample_bank_statement.csv`](file:///home/midhun/team-astrax/docs/sample_bank_statement.csv) for realistic demo transactions covering exact matches, partial deposits, customer wire transfers, unmatched refunds, and duplicate rows.
+
 ---
 
 ## 🧪 Automated Test Suite
 
-The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, automated operations, demo clock simulation, and security isolation:
+The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, automated operations, demo clock simulation, bank statement reconciliation, and security isolation:
 
 ```bash
 python manage.py test
 ```
 ```text
-Ran 146 tests in 58.807s - OK (146/146 passing)
+Ran 154 tests in 64.981s - OK (154/154 passing)
 ```
 
 ---

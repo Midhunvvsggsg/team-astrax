@@ -3,13 +3,17 @@ from decimal import Decimal
 
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from catalog.models import Plan, Product, Tax
-from invoicing.models import Invoice, Payment
+from invoicing.models import BankStatement, BankStatementRow, Invoice, Payment
+from invoicing.reconciliation import (
+    parse_statement_csv,
+)
 from invoicing.services import advance_period_date, generate_invoices
 from subscriptions.models import DiscountRule, Subscription, SubscriptionLine
 
@@ -1190,6 +1194,303 @@ class FinanceDashboardTests(TestCase):
         # Navigating to '/' redirects customer to their customer portal
         res_home = self.client.get(reverse('home'))
         self.assertRedirects(res_home, reverse('customer_portal'))
+
+
+class BankStatementReconciliationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email='admin@brightloop.com',
+            password='AdminPassword@1'
+        )
+        self.staff = User.objects.create_user(
+            email='staff@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.customer = User.objects.create_user(
+            email='acme@corp.com',
+            first_name='Acme',
+            last_name='Corp',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.other_customer = User.objects.create_user(
+            email='beta@solutions.com',
+            first_name='Beta',
+            last_name='Solutions',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+
+        self.plan = Plan.objects.create(
+            name="Pro Plan",
+            price=Decimal('100.00'),
+            billing_period=Plan.BillingPeriod.MONTHLY
+        )
+        self.product = Product.objects.create(name="Seat", sales_price=Decimal('100.00'))
+
+        self.sub1 = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            start_date=date(2026, 1, 1),
+            status=Subscription.Status.ACTIVE,
+        )
+        SubscriptionLine.objects.create(subscription=self.sub1, product=self.product, quantity=1, unit_price=Decimal('100.00'))
+
+        # Create confirmed invoice 1 for Acme Corp
+        self.inv1 = Invoice.objects.create(
+            customer=self.customer,
+            subscription=self.sub1,
+            issue_date=date(2026, 1, 1),
+            due_date=date(2026, 1, 15),
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00'),
+        )
+        # Create confirmed invoice 2 for Beta Solutions
+        self.sub2 = Subscription.objects.create(
+            customer=self.other_customer,
+            plan=self.plan,
+            start_date=date(2026, 1, 1),
+            status=Subscription.Status.ACTIVE,
+        )
+        SubscriptionLine.objects.create(subscription=self.sub2, product=self.product, quantity=1, unit_price=Decimal('100.00'))
+        self.inv2 = Invoice.objects.create(
+            customer=self.other_customer,
+            subscription=self.sub2,
+            issue_date=date(2026, 1, 1),
+            due_date=date(2026, 1, 15),
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00'),
+        )
+
+        self.client = Client()
+
+    def test_exact_match_auto_reconciliation(self):
+        """
+        Row matching exact invoice number and exact amount is auto-reconciled (High Confidence).
+        Payment is automatically recorded and invoice transitions to Paid.
+        """
+        csv_data = (
+            f"date,description,amount,reference\n"
+            f"2026-01-10,Wire settlement from Acme,100.00,{self.inv1.invoice_number} Acme Corp\n"
+        )
+        uploaded = SimpleUploadedFile("statement.csv", csv_data.encode('utf-8'), content_type="text/csv")
+
+        self.client.force_login(self.staff)
+        resp = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': uploaded}, follow=True)
+        self.assertEqual(resp.status_code, 200)
+
+        statement = BankStatement.objects.latest('id')
+        self.assertEqual(statement.total_rows, 1)
+        self.assertEqual(statement.auto_reconciled_count, 1)
+        self.assertEqual(statement.needs_review_count, 0)
+        self.assertEqual(statement.unmatched_count, 0)
+
+        row = statement.rows.first()
+        self.assertEqual(row.status, BankStatementRow.Status.AUTO_RECONCILED)
+        self.assertEqual(row.confidence, BankStatementRow.Confidence.HIGH)
+        self.assertIsNotNone(row.payment)
+        self.assertEqual(row.payment.amount, Decimal('100.00'))
+
+        self.inv1.refresh_from_db()
+        self.assertEqual(self.inv1.status, Invoice.Status.PAID)
+        self.assertEqual(self.inv1.amount_due, Decimal('0.00'))
+
+    def test_partial_payment_medium_confidence_and_one_click_approval(self):
+        """
+        Row matching invoice number but with partial amount without name confirmation
+        is placed in review (Medium Confidence). One-click approval records partial payment.
+        """
+        csv_data = (
+            f"date,description,amount,reference\n"
+            f"2026-01-12,Direct Deposit Part Payment,40.00,{self.inv2.invoice_number}\n"
+        )
+        uploaded = SimpleUploadedFile("statement.csv", csv_data.encode('utf-8'), content_type="text/csv")
+
+        self.client.force_login(self.staff)
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': uploaded})
+
+        statement = BankStatement.objects.latest('id')
+        self.assertEqual(statement.auto_reconciled_count, 0)
+        self.assertEqual(statement.needs_review_count, 1)
+
+        row = statement.rows.first()
+        self.assertEqual(row.status, BankStatementRow.Status.NEEDS_REVIEW)
+        self.assertEqual(row.confidence, BankStatementRow.Confidence.MEDIUM)
+        self.assertIsNone(row.payment)
+
+        # Staff approves via one-click review button
+        approve_url = reverse('invoicing:reconciliation_row_approve', kwargs={'row_pk': row.pk})
+        resp_approve = self.client.post(approve_url, follow=True)
+        self.assertEqual(resp_approve.status_code, 200)
+
+        row.refresh_from_db()
+        self.assertEqual(row.status, BankStatementRow.Status.MANUALLY_RECONCILED)
+        self.assertIsNotNone(row.payment)
+        self.assertEqual(row.payment.amount, Decimal('40.00'))
+
+        self.inv2.refresh_from_db()
+        # Invoice remains Confirmed because only partial payment recorded ($40 of $100)
+        self.assertEqual(self.inv2.status, Invoice.Status.CONFIRMED)
+        self.assertEqual(self.inv2.amount_due, Decimal('60.00'))
+
+    def test_customer_name_similarity_without_invoice_number(self):
+        """
+        Row without invoice number matches by customer name similarity and exact amount.
+        """
+        csv_data = (
+            "date,description,amount,reference\n"
+            "2026-01-14,Subscription Settlement,100.00,Acme Corp monthly direct wire\n"
+        )
+        uploaded = SimpleUploadedFile("statement.csv", csv_data.encode('utf-8'), content_type="text/csv")
+
+        self.client.force_login(self.staff)
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': uploaded})
+
+        statement = BankStatement.objects.latest('id')
+        row = statement.rows.first()
+        self.assertEqual(row.matched_invoice, self.inv1)
+        self.assertIn(row.status, [BankStatementRow.Status.AUTO_RECONCILED, BankStatementRow.Status.NEEDS_REVIEW])
+
+    def test_ambiguous_matching_queued_for_review(self):
+        """
+        When multiple candidate invoices exist for the same customer with equal amounts,
+        the system marks the row as Medium Confidence (Needs Review) to prevent incorrect auto-application.
+        """
+        # Create a second confirmed invoice for Acme Corp with same amount
+        Invoice.objects.create(
+            customer=self.customer,
+            subscription=self.sub1,
+            issue_date=date(2026, 2, 1),
+            due_date=date(2026, 2, 15),
+            period_start=date(2026, 2, 1),
+            period_end=date(2026, 2, 28),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00'),
+        )
+
+        csv_data = (
+            "date,description,amount,reference\n"
+            "2026-02-10,Wire Transfer,100.00,Acme Corp wire transfer\n"
+        )
+        uploaded = SimpleUploadedFile("statement.csv", csv_data.encode('utf-8'), content_type="text/csv")
+
+        self.client.force_login(self.staff)
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': uploaded})
+
+        statement = BankStatement.objects.latest('id')
+        row = statement.rows.first()
+        self.assertEqual(row.confidence, BankStatementRow.Confidence.MEDIUM)
+        self.assertEqual(row.status, BankStatementRow.Status.NEEDS_REVIEW)
+        self.assertIn("Ambiguous", row.match_reasons)
+
+    def test_unmatched_row_and_manual_handling(self):
+        """
+        Row with unknown reference and unknown amount is marked Unmatched (Low Confidence).
+        Staff can select an invoice from the dropdown to reconcile manually.
+        """
+        csv_data = (
+            "date,description,amount,reference\n"
+            "2026-01-15,Random unidentifiable deposit,55.00,UNKNOWN REF 9999\n"
+        )
+        uploaded = SimpleUploadedFile("statement.csv", csv_data.encode('utf-8'), content_type="text/csv")
+
+        self.client.force_login(self.staff)
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': uploaded})
+
+        statement = BankStatement.objects.latest('id')
+        self.assertEqual(statement.unmatched_count, 1)
+
+        row = statement.rows.first()
+        self.assertEqual(row.status, BankStatementRow.Status.UNMATCHED)
+        self.assertEqual(row.confidence, BankStatementRow.Confidence.LOW)
+        self.assertIsNone(row.matched_invoice)
+
+        # Staff manually assigns row to inv1
+        manual_url = reverse('invoicing:reconciliation_row_manual', kwargs={'row_pk': row.pk})
+        resp_manual = self.client.post(manual_url, {'invoice_id': self.inv1.pk}, follow=True)
+        self.assertEqual(resp_manual.status_code, 200)
+
+        row.refresh_from_db()
+        self.assertEqual(row.status, BankStatementRow.Status.MANUALLY_RECONCILED)
+        self.assertEqual(row.matched_invoice, self.inv1)
+        self.assertIsNotNone(row.payment)
+        self.assertEqual(row.payment.amount, Decimal('55.00'))
+
+    def test_duplicate_upload_idempotency(self):
+        """
+        Uploading the same CSV twice stores a SHA-256 hash per row and skips
+        already reconciled transactions, guaranteeing no row is applied twice.
+        """
+        csv_data = (
+            f"date,description,amount,reference\n"
+            f"2026-01-10,Wire settlement,100.00,{self.inv1.invoice_number} Acme Corp\n"
+        )
+
+        self.client.force_login(self.staff)
+
+        # First upload: Auto-reconciled
+        file1 = SimpleUploadedFile("statement_first.csv", csv_data.encode('utf-8'), content_type="text/csv")
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': file1})
+        self.assertEqual(Payment.objects.filter(invoice=self.inv1).count(), 1)
+
+        # Second upload with identical row data
+        file2 = SimpleUploadedFile("statement_second.csv", csv_data.encode('utf-8'), content_type="text/csv")
+        self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': file2})
+
+        # Statement 2 marks row as DUPLICATE
+        statement2 = BankStatement.objects.latest('id')
+        self.assertEqual(statement2.duplicate_count, 1)
+        self.assertEqual(statement2.auto_reconciled_count, 0)
+
+        row2 = statement2.rows.first()
+        self.assertEqual(row2.status, BankStatementRow.Status.DUPLICATE)
+        self.assertIn("Duplicate transaction ignored", row2.match_reasons)
+
+        # Payments count strictly unchanged (no double billing!)
+        self.assertEqual(Payment.objects.filter(invoice=self.inv1).count(), 1)
+
+    def test_file_type_and_size_validation(self):
+        """Validates file extension, empty files, missing columns, and file size limits."""
+        self.client.force_login(self.staff)
+
+        # 1. Non-CSV extension rejected
+        txt_file = SimpleUploadedFile("statement.txt", b"date,description,amount,reference\n", content_type="text/plain")
+        resp = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': txt_file}, follow=True)
+        self.assertContains(resp, "Invalid file format. Only .CSV files are accepted")
+
+        # 2. Empty CSV rejected
+        empty_file = SimpleUploadedFile("empty.csv", b"", content_type="text/csv")
+        resp = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': empty_file}, follow=True)
+        self.assertContains(resp, "The uploaded CSV file is empty")
+
+        # 3. Missing required columns rejected
+        bad_csv = SimpleUploadedFile("bad.csv", b"date,amount\n2026-01-01,50.00\n", content_type="text/csv")
+        resp = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': bad_csv}, follow=True)
+        self.assertContains(resp, "Missing required CSV column")
+
+        # 4. Exceeds 5MB rejected
+        large_content = b"x" * (6 * 1024 * 1024)
+        large_file = SimpleUploadedFile("large.csv", large_content, content_type="text/csv")
+        rows, errors = parse_statement_csv(large_file)
+        self.assertEqual(len(rows), 0)
+        self.assertTrue(any("exceeds the 5MB limit" in err for err in errors))
+
+    def test_customer_forbidden_from_reconciliation(self):
+        """Customers are strictly forbidden from accessing the bank reconciliation system."""
+        self.client.force_login(self.customer)
+
+        resp = self.client.get(reverse('invoicing:reconciliation_dashboard'))
+        self.assertEqual(resp.status_code, 403)
+
+        dummy_csv = SimpleUploadedFile("statement.csv", b"date,description,amount,reference\n", content_type="text/csv")
+        resp_post = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': dummy_csv})
+        self.assertEqual(resp_post.status_code, 403)
+
 
 
 
