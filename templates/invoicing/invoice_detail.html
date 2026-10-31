@@ -3,10 +3,19 @@
 {% block title %}{{ invoice.invoice_number }} - Invoice Details{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: var(--space-16); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
-  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'invoicing:invoice_list' %}{% endif %}" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.85rem;">
-    ← Back
-  </a>
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'home' %}">Home</a>
+  <span class="breadcrumb-separator">/</span>
+  {% if user.is_customer %}
+    <a href="{% url 'customer_portal' %}">Customer Portal</a>
+  {% else %}
+    <a href="{% url 'invoicing:invoice_list' %}">Invoices</a>
+  {% endif %}
+  <span class="breadcrumb-separator">/</span>
+  <span class="breadcrumb-current">{{ invoice.invoice_number }}</span>
+</nav>
+
+<div style="margin-bottom: var(--space-16); display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
   <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
     <a href="{% url 'invoicing:invoice_print' pk=invoice.pk %}" class="btn btn-secondary" target="_blank">
       🖨️ Print / PDF

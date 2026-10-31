@@ -3,11 +3,13 @@
 {% block title %}{{ template.name }} - Quotation Template{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: var(--space-16);">
-  <a href="{% url 'subscriptions:template_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
-    ← Back to Templates
-  </a>
-</div>
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'home' %}">Home</a>
+  <span class="breadcrumb-separator">/</span>
+  <a href="{% url 'subscriptions:template_list' %}">Quotation Templates</a>
+  <span class="breadcrumb-separator">/</span>
+  <span class="breadcrumb-current">{{ template.name }}</span>
+</nav>
 
 <!-- Template Header -->
 <div class="card" style="margin-bottom: var(--space-24);">

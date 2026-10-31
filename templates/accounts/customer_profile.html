@@ -3,11 +3,13 @@
 {% block title %}My Profile - Brightloop{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: var(--space-16);">
-  <a href="{% url 'customer_portal' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
-    ← Back to Portal
-  </a>
-</div>
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'home' %}">Home</a>
+  <span class="breadcrumb-separator">/</span>
+  <a href="{% url 'customer_portal' %}">Customer Portal</a>
+  <span class="breadcrumb-separator">/</span>
+  <span class="breadcrumb-current">My Profile</span>
+</nav>
 
 <div style="max-width: 600px; margin: 0 auto;">
   <div class="card">

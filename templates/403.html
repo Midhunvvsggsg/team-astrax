@@ -3,14 +3,14 @@
 {% block title %}Access Denied (403) - Brightloop{% endblock %}
 
 {% block content %}
-<div style="max-width: 500px; margin: 40px auto; text-align: center;">
-  <div class="card">
+<div style="max-width: 520px; margin: 40px auto; text-align: center;">
+  <div class="card" style="padding: var(--space-32) var(--space-24);">
     <div style="font-size: 3.5rem; margin-bottom: var(--space-8); color: var(--color-danger);">⛔</div>
-    <h1 class="card-title" style="color: var(--color-danger);">403 - Permission Denied</h1>
-    <p class="card-subtitle" style="margin: var(--space-16) 0 var(--space-24);">
-      {{ exception|default:"You do not have the required permissions to access this page. This boundary is enforced on the server." }}
+    <h1 class="card-title" style="color: var(--color-danger); margin-bottom: var(--space-8);">403 - Permission Denied</h1>
+    <p class="card-subtitle" style="margin: 0 auto var(--space-24); max-width: 420px; font-size: var(--font-size-base);">
+      {{ exception|default:"You do not have the required permissions to access this page or resource. This boundary is enforced on the server." }}
     </p>
-    <div style="display: flex; justify-content: center; gap: var(--space-16);">
+    <div style="display: flex; justify-content: center; gap: var(--space-12); flex-wrap: wrap;">
       <a href="{% url 'home' %}" class="btn btn-primary">Return Home</a>
       <a href="{% url 'login' %}" class="btn btn-secondary">Switch Account</a>
     </div>

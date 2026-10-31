@@ -21,7 +21,9 @@
       </button>
 
       <ul class="nav-links" id="navMenu">
-        <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
+        {% if not user.is_authenticated %}
+          <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
+        {% endif %}
 
         {% if user.is_authenticated %}
           {% if user.is_customer %}
@@ -30,7 +32,7 @@
             <li><a href="{% url 'customer_profile' %}" class="nav-link {% if 'profile' in request.resolver_match.url_name or 'password' in request.resolver_match.url_name %}active{% endif %}">My Profile</a></li>
           {% elif user.is_staff_member or user.is_admin %}
             <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="{% url 'subscriptions:subscription_list' %}" class="nav-link {% if 'subscription' in request.resolver_match.url_name %}active{% endif %}">Subscriptions</a></li>
+            <li><a href="{% url 'subscriptions:subscription_list' %}" class="nav-link {% if 'subscription' in request.resolver_match.url_name and request.resolver_match.url_name != 'customer_portal' %}active{% endif %}">Subscriptions</a></li>
             <li><a href="{% url 'invoicing:invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name %}active{% endif %}">Invoices</a></li>
             <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">Payments</a></li>
             <li><a href="{% url 'subscriptions:template_list' %}" class="nav-link {% if 'template' in request.resolver_match.url_name %}active{% endif %}">Quotes & Templates</a></li>
@@ -102,19 +104,36 @@
 
     // Double-submit prevention and loading feedback
     document.querySelectorAll('form').forEach(form => {
-      form.addEventListener('submit', function() {
+      form.addEventListener('submit', function(e) {
+        if (!this.checkValidity()) {
+          return;
+        }
         const submitBtn = this.querySelector('button[type="submit"]:not(.no-disable)');
         if (submitBtn && !submitBtn.disabled) {
           const originalText = submitBtn.innerHTML;
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
-          // Re-enable after 8 seconds in case validation halts submission
+          setTimeout(() => {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner" style="margin-right: 6px;"></span> Processing...';
+          }, 20);
+          // Re-enable after 8 seconds in case validation or response halts
           setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
           }, 8000);
         }
       });
+    });
+
+    // Delegated confirmation for destructive elements with data-confirm
+    document.addEventListener('click', function(e) {
+      const target = e.target.closest('[data-confirm]');
+      if (target) {
+        const msg = target.getAttribute('data-confirm') || 'Are you sure you want to proceed?';
+        if (!confirm(msg)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
     });
   </script>
   {% block extra_js %}{% endblock %}

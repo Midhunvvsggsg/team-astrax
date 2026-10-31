@@ -3,11 +3,17 @@
 {% block title %}{{ subscription.subscription_number }} - Subscription Details{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: var(--space-16);">
-  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'subscriptions:subscription_list' %}{% endif %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
-    ← Back
-  </a>
-</div>
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'home' %}">Home</a>
+  <span class="breadcrumb-separator">/</span>
+  {% if user.is_customer %}
+    <a href="{% url 'customer_portal' %}">Customer Portal</a>
+  {% else %}
+    <a href="{% url 'subscriptions:subscription_list' %}">Subscriptions</a>
+  {% endif %}
+  <span class="breadcrumb-separator">/</span>
+  <span class="breadcrumb-current">{{ subscription.subscription_number }}</span>
+</nav>
 
 <!-- Header Card -->
 <div class="card" style="margin-bottom: var(--space-24);">

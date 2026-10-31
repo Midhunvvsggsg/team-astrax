@@ -559,16 +559,112 @@ a:hover {
   font-weight: 700;
 }
 
-/* Grid helper */
+/* Breadcrumbs */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.breadcrumb a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.breadcrumb a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: var(--color-border);
+  user-select: none;
+}
+
+.breadcrumb-current {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Grids */
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-24);
 }
 
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-24);
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-24);
+}
+
+/* Responsive Breakpoints: Tablet (768px) and Mobile (375px - 480px) */
+@media (max-width: 1024px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .grid-2 {
+  .container {
+    padding-left: var(--space-12);
+    padding-right: var(--space-12);
+  }
+  .main-content {
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-24);
+  }
+  .grid-2, .grid-3, .grid-4 {
     grid-template-columns: 1fr;
+    gap: var(--space-16);
+  }
+  .card {
+    padding: var(--space-16);
+  }
+  .card-header {
+    margin-bottom: var(--space-16);
+    padding-bottom: var(--space-12);
+  }
+  .table th, .table td {
+    padding: var(--space-12) var(--space-8);
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --font-size-2xl: 1.25rem;
+    --font-size-3xl: 1.5rem;
+  }
+  .container {
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
+  }
+  .card {
+    padding: var(--space-12);
+    border-radius: var(--radius-md);
+  }
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+  }
+  .table {
+    min-width: 520px;
   }
 }
 

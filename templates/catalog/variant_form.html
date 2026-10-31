@@ -4,11 +4,15 @@
 
 {% block content %}
 <div style="max-width: 500px; margin: 0 auto;">
-  <div style="margin-bottom: var(--space-16);">
-    <a href="{% url 'catalog:product_detail' pk=product.pk %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
-      ← Back to {{ product.name }}
-    </a>
-  </div>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="{% url 'home' %}">Dashboard</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'catalog:product_list' %}">Products</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="{% url 'catalog:product_detail' pk=product.pk %}">{{ product.name }}</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">Edit Variant</span>
+  </nav>
 
   <div class="card">
     <div class="card-header">
