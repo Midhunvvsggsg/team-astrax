@@ -511,7 +511,7 @@ class InvoiceSendAndPrintTests(TestCase):
         res_staff = self.client.get(reverse('invoicing:invoice_print', kwargs={'pk': self.invoice.pk}))
         self.assertEqual(res_staff.status_code, 200)
         self.assertContains(res_staff, self.invoice.invoice_number)
-        self.assertContains(res_staff, "Brightloop Software")
+        self.assertContains(res_staff, "AstraFlow Software")
 
         # 2. Invoice Customer owner access
         self.client.force_login(self.customer)
@@ -1728,7 +1728,7 @@ class MonthlyFinanceReportTests(TestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         msg = mail.outbox[0]
-        self.assertIn("Brightloop Month-End Finance Report: April 2026", msg.subject)
+        self.assertIn("AstraFlow Month-End Finance Report: April 2026", msg.subject)
         self.assertIn("Active Subscriptions:", msg.body)
         self.assertIn("MRR:", msg.body)
         self.assertIn("Revenue Received:", msg.body)
@@ -1742,10 +1742,10 @@ class MonthlyFinanceReportTests(TestCase):
         resp = self.client.get(reverse('invoicing:report_csv', kwargs={'pk': report.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertIn('text/csv', resp['Content-Type'])
-        self.assertIn('attachment; filename="Brightloop_Monthly_Report_2026_05.csv"', resp['Content-Disposition'])
+        self.assertIn('attachment; filename="AstraFlow_Monthly_Report_2026_05.csv"', resp['Content-Disposition'])
 
         csv_text = resp.content.decode('utf-8')
-        self.assertIn("BRIGHTLOOP MONTH-END FINANCE REPORT", csv_text)
+        self.assertIn("ASTRAFLOW MONTH-END FINANCE REPORT", csv_text)
         self.assertIn("Period,May 2026", csv_text)
         self.assertIn("Monthly Recurring Revenue (MRR)", csv_text)
         self.assertIn("OVERDUE AGING BUCKET", csv_text)

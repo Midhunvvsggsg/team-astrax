@@ -10,7 +10,7 @@ register = template.Library()
 @register.filter(name='currency')
 def currency(value: Any, mode: Union[str, bool, None] = None) -> str:
     """
-    Standard currency formatter for Brightloop.
+    Standard currency formatter for AstraFlow.
     - Default mode: Formats with thousands separators and 2 decimal places ($5,966,696.42).
     - Compact mode (e.g. |currency:"compact"): For very large numbers (>= $1M), displays
       compact notation like $16.3M or $1.2B with the full formatted amount in a `title` tooltip.

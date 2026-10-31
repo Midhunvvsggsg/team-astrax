@@ -330,7 +330,7 @@ def invoice_send(request, pk):
     """Sends invoice to the customer via email using the configured console email backend."""
     invoice = get_object_or_404(Invoice, pk=pk)
     if request.method == 'POST':
-        subject = f"Invoice {invoice.invoice_number} from Brightloop Software"
+        subject = f"Invoice {invoice.invoice_number} from AstraFlow Software"
         body = (
             f"Dear {invoice.customer.full_name or invoice.customer.email},\n\n"
             f"Please find below the details for invoice {invoice.invoice_number}:\n\n"
@@ -348,7 +348,7 @@ def invoice_send(request, pk):
             f"Payment Terms: {invoice.subscription.get_payment_terms_display()}\n\n"
             f"You may review this invoice anytime in your customer self-service portal.\n\n"
             f"Best regards,\n"
-            f"Brightloop Software Finance Team\n"
+            f"AstraFlow Software Finance Team\n"
             f"billing@brightloop.local\n"
         )
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'billing@brightloop.local')
@@ -678,6 +678,6 @@ def monthly_report_download_csv(request, pk):
     csv_data = generate_report_csv(report)
 
     response = HttpResponse(csv_data, content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="Brightloop_Monthly_Report_{report.year}_{report.month:02d}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="AstraFlow_Monthly_Report_{report.year}_{report.month:02d}.csv"'
     return response
 

@@ -10,9 +10,9 @@ revenue. Think of it as the digital backbone of a company that earns its money e
 month, not just once. Read the scenes that follow as things that actually happen in an
 ordinary billing month, and design the system that makes each of them easy.
 
-## 2) Meet Brightloop Software
+## 2) Meet AstraFlow Software
 
-Brightloop Software sells everything on subscription: business software billed by the
+AstraFlow Software sells everything on subscription: business software billed by the
 month or the year, add-ons customers switch on and off, and a few products that come in
 different variants. Customers range from small shops on a monthly plan to large companies
 on yearly contracts. An admin sets up products, plans, taxes and discounts, a small
@@ -29,13 +29,13 @@ own subscriptions without having to email anyone.
 Renewals get missed, invoices go out wrong, and nobody can say how much recurring revenue
 the company actually has.
 
-## 3) A Month at Brightloop
+## 3) A Month at AstraFlow
 
-The scenes below follow one billing month at Brightloop Software, from a new customer
+The scenes below follow one billing month at AstraFlow Software, from a new customer
 creating an account to the finance lead reviewing the numbers.
 
 ### A new customer signs up
-A small business finds Brightloop online and creates an account with their email and a
+A small business finds AstraFlow online and creates an account with their email and a
 password. Each email can belong to only one account, and the password must be more than
 eight characters, with an uppercase letter, a lowercase letter and a special character.
 If they forget it later, a reset link should arrive at their registered email.
@@ -46,7 +46,7 @@ own subscriptions and invoices through a portal. Only the admin can add a new me
 staff.
 
 ### Launching a new plan
-Brightloop is launching a new product. The admin adds it with its name, type, sales price,
+AstraFlow is launching a new product. The admin adds it with its name, type, sales price,
 cost price and notes, and offers it in variants, for example by brand, where choosing the
 Odoo brand adds 560 to the price.
 

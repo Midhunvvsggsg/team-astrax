@@ -2,16 +2,16 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
 
 from accounts.models import User
-from accounts.validators import BrightloopPasswordValidator
+from accounts.validators import AstraFlowPasswordValidator
 
 
 class Command(BaseCommand):
-    help = "Creates an initial Admin user for Brightloop Subscription Management System"
+    help = "Creates an initial Admin user for AstraFlow Subscription Management System"
 
     def add_arguments(self, parser):
         parser.add_argument('--email', type=str, default='admin@brightloop.com', help='Admin email')
         parser.add_argument('--password', type=str, default='Admin@12345', help='Admin password')
-        parser.add_argument('--first-name', type=str, default='Brightloop', help='First name')
+        parser.add_argument('--first-name', type=str, default='AstraFlow', help='First name')
         parser.add_argument('--last-name', type=str, default='Admin', help='Last name')
 
     def handle(self, *args, **options):
@@ -20,7 +20,7 @@ class Command(BaseCommand):
         first_name = options['first_name']
         last_name = options['last_name']
 
-        validator = BrightloopPasswordValidator()
+        validator = AstraFlowPasswordValidator()
         try:
             validator.validate(password)
         except ValidationError as e:

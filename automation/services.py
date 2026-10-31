@@ -173,7 +173,7 @@ def execute_daily_jobs(
                         f"({sub.plan.name}) is scheduled to expire on {sub.expiry_date}.\n\n"
                         f"Because this plan is not set to auto-renew, your access will terminate on this date.\n"
                         f"Please contact support or visit your customer portal to select a new plan.\n\n"
-                        f"Brightloop Operations Team\n"
+                        f"AstraFlow Operations Team\n"
                     )
 
                     send_mail(subject, body, from_email, [sub.customer.email], fail_silently=False)
@@ -231,7 +231,7 @@ def execute_daily_jobs(
                             f"Outstanding Balance Due: ${inv.amount_due}\n"
                             f"Subscription: {inv.subscription.subscription_number} ({inv.subscription.plan.name})\n\n"
                             f"Please sign in to your customer portal to submit payment immediately.\n\n"
-                            f"Brightloop Accounts Receivable\n"
+                            f"AstraFlow Accounts Receivable\n"
                         )
 
                         send_mail(subject, body, from_email, [inv.customer.email], fail_silently=False)

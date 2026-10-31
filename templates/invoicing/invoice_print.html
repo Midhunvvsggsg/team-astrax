@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Invoice {{ invoice.invoice_number }} - Brightloop Software</title>
+  <title>Invoice {{ invoice.invoice_number }} - AstraFlow Software</title>
   <link rel="stylesheet" href="{% static 'css/theme.css' %}">
   <style>
     body {
@@ -33,7 +33,7 @@
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;">
       <div>
-        <h1 style="font-size: 1.75rem; font-weight: 800; color: #4f46e5; margin-bottom: 4px;">Brightloop Software</h1>
+        <h1 style="font-size: 1.75rem; font-weight: 800; color: #4f46e5; margin-bottom: 4px;">AstraFlow Software</h1>
         <p style="font-size: 0.85rem; color: #64748b;">Enterprise Subscription Management & Billing</p>
         <p style="font-size: 0.85rem; color: #64748b;">billing@brightloop.local</p>
       </div>
@@ -125,7 +125,7 @@
 
     <!-- Footer Note -->
     <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.8rem; color: #64748b; text-align: center;">
-      <p>Thank you for your business with Brightloop Software.</p>
+      <p>Thank you for your business with AstraFlow Software.</p>
       <p>Payment terms: {{ invoice.subscription.get_payment_terms_display }}. Please remit payment by {{ invoice.due_date|date:"F d, Y" }}.</p>
     </div>
   </div>

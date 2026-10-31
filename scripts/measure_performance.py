@@ -62,7 +62,7 @@ def measure_pages():
     ]
 
     print("\n" + "=" * 80)
-    print("BRIGHTLOOP PERFORMANCE AUDIT REPORT (5,000+ Subscriptions Benchmark)")
+    print("ASTRAFLOW PERFORMANCE AUDIT REPORT (5,000+ Subscriptions Benchmark)")
     print("=" * 80)
     print(f"Total Subscriptions in Database : {Subscription.objects.count():,}")
     print(f"Total Invoices in Database      : {Invoice.objects.count():,}")

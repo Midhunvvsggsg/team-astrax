@@ -147,7 +147,7 @@ def run_overflow_checks() -> bool:
     Returns True if all checks pass without horizontal overflow, False otherwise.
     """
     print("=" * 80)
-    print("Brightloop UI Horizontal Overflow Verification")
+    print("AstraFlow UI Horizontal Overflow Verification")
     print(f"Target Widths: {TARGET_WIDTHS}")
     print(f"Target Pages:  {[p[0] for p in TARGET_PAGES]}")
     print("=" * 80)

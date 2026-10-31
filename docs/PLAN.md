@@ -1,7 +1,7 @@
-# Hackathon Plan: Brightloop Subscription Management System
+# Hackathon Plan: AstraFlow Subscription Management System
 
 ## 1. Problem Statement
-Brightloop Software needs an integrated subscription & recurring billing platform that automates the lifecycle of subscriptions—from product/plan definition and quotation to idempotent invoice generation, payment processing, customer self-service, and real-time financial reporting.
+AstraFlow Software needs an integrated subscription & recurring billing platform that automates the lifecycle of subscriptions—from product/plan definition and quotation to idempotent invoice generation, payment processing, customer self-service, and real-time financial reporting.
 
 **Core User:** Business Admin / Staff & Customer  
 **Core Flow:** Configure Plans & Products -> Create Quotation / Subscription -> Automated Idempotent Billing -> Record Payments -> Real-Time Finance Analytics.

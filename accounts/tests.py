@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from accounts.forms import CustomerSignupForm
 from accounts.models import User
-from accounts.validators import BrightloopPasswordValidator
+from accounts.validators import AstraFlowPasswordValidator
 
 
 class CustomUserModelTests(TestCase):
@@ -44,7 +44,7 @@ class CustomUserModelTests(TestCase):
 
 class PasswordValidatorTests(TestCase):
     def setUp(self):
-        self.validator = BrightloopPasswordValidator()
+        self.validator = AstraFlowPasswordValidator()
 
     def test_password_length_must_be_more_than_8(self):
         # 8 characters should fail (must be MORE than 8, so at least 9)

@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
         random.seed(42)  # Deterministic repeatability
 
-        self.stdout.write(self.style.NOTICE("=== Starting Brightloop Demo Data Seeder ==="))
+        self.stdout.write(self.style.NOTICE("=== Starting AstraFlow Demo Data Seeder ==="))
 
         if should_reset:
             self.stdout.write("Reset requested. Purging existing application data...")

@@ -55,7 +55,7 @@ def signup_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            messages.success(request, f"Welcome to Brightloop, {user.first_name or user.email}! Your customer account has been created.")
+            messages.success(request, f"Welcome to AstraFlow, {user.first_name or user.email}! Your customer account has been created.")
             return redirect('customer_portal')
         else:
             messages.error(request, "Please correct the errors below.")

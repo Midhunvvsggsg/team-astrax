@@ -1,6 +1,6 @@
-# Brightloop - 2-Minute Demo Script & Judge Q&A Guide
+# AstraFlow - 2-Minute Demo Script & Judge Q&A Guide
 
-Welcome to **Brightloop Software** — the digital backbone for recurring subscription businesses. This guide provides a rapid 2-minute demo script walking through a customer's monthly lifecycle, followed by concise answers to 8 likely judge questions.
+Welcome to **AstraFlow Software** — the digital backbone for recurring subscription businesses. This guide provides a rapid 2-minute demo script walking through a customer's monthly lifecycle, followed by concise answers to 8 likely judge questions.
 
 ---
 

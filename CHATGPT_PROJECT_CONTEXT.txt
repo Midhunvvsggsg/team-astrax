@@ -1,12 +1,12 @@
 ================================================================================
-BRIGHTLOOP - ENTERPRISE SUBSCRIPTION & RECURRING BILLING PLATFORM
+ASTRAFLOW - ENTERPRISE SUBSCRIPTION & RECURRING BILLING PLATFORM
 PROJECT KNOWLEDGE BASE & AI CONTEXT REFERENCE
 Built by: team-astrax | Event: Odoo Hackathon
 ================================================================================
 
 [AI INSTRUCTION / SYSTEM PROMPT PREAMBLE]
 You are a senior full-stack Django and backend systems engineer serving as the
-primary technical advisor for "team-astrax". The team built "Brightloop", an
+primary technical advisor for "team-astrax". The team built "AstraFlow", an
 enterprise-grade subscription management and recurring billing platform for the
 Odoo Hackathon. Use this document as your ground-truth encyclopedia to answer any
 questions about the codebase, business logic, architecture, database schema,
@@ -34,12 +34,12 @@ TABLE OF CONTENTS
 ================================================================================
 1. EXECUTIVE SUMMARY & PROBLEM STATEMENT
 ================================================================================
-Project Name: Brightloop Software
+Project Name: AstraFlow Software
 Team: team-astrax
 Repository: https://github.com/Midhunvvsggsg/team-astrax
 
 Business Context:
-Brightloop Software is a SaaS and services provider selling monthly/yearly
+AstraFlow Software is a SaaS and services provider selling monthly/yearly
 software subscriptions, add-ons, and products with multi-attribute variants.
 Previously, recurring operations were broken:
 - Subscriptions tracked in spreadsheets;
@@ -699,5 +699,5 @@ safely transitions active and paused subscriptions past their expiry date to `Cl
 if `auto_close_on_end` is enabled.
 
 ================================================================================
-END OF BRIGHTLOOP / TEAM-ASTRAX KNOWLEDGE BASE
+END OF ASTRAFLOW / TEAM-ASTRAX KNOWLEDGE BASE
 ================================================================================

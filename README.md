@@ -1,4 +1,4 @@
-# Brightloop - Enterprise Subscription & Recurring Billing Platform
+# AstraFlow - Enterprise Subscription & Recurring Billing Platform
 
 Built by **team-astrax** for the Odoo Hackathon.
 
@@ -52,7 +52,7 @@ Open your browser at: **`http://127.0.0.1:8000/`**
 
 ---
 
-## 📖 Feature Mapping: A Month at Brightloop (`docs/SPEC.md`)
+## 📖 Feature Mapping: A Month at AstraFlow (`docs/SPEC.md`)
 
 | Scene from `docs/SPEC.md` | Implementation in Code | Key Capabilities & Enforcements |
 |---|---|---|
@@ -167,7 +167,7 @@ Audited via `scripts/measure_performance.py` against a database containing **5,0
 
 ## 🤖 Automated Daily Operations & Scheduled Jobs (`run_daily_jobs`)
 
-Brightloop eliminates manual billing and operations tasks through an automated daily batch engine that runs in strict sequential order with transaction isolation per step:
+AstraFlow eliminates manual billing and operations tasks through an automated daily batch engine that runs in strict sequential order with transaction isolation per step:
 
 1. **Step (a): Recurring Billing Catch-Up:** Calls `generate_invoices` across all active subscriptions with missed billing cycles. Guaranteed idempotent via composite `(subscription, period_start)` unique constraints.
 2. **Step (b): Subscription Auto-Renewals:** Discovers active subscriptions on renewable plans (`renewable=True`) expiring within 3 days (`as_of_date <= expiry_date <= as_of_date + 3d`). Extends the expiry date by the plan's billing period and records renewal status audit history. Guaranteed idempotent: never renews twice for the same cycle.
@@ -180,7 +180,7 @@ Brightloop eliminates manual billing and operations tasks through an automated d
 ### 📅 Production Scheduling via Cron (Recommended)
 Add the following entry to your server's crontab (`crontab -e`) to execute the daily operations every night at midnight:
 ```cron
-# Brightloop Automated Daily Operations (Midnight UTC / Local)
+# AstraFlow Automated Daily Operations (Midnight UTC / Local)
 0 0 * * * cd /home/midhun/team-astrax && /home/midhun/team-astrax/.venv/bin/python manage.py run_daily_jobs >> /var/log/brightloop_daily_jobs.log 2>&1
 ```
 
@@ -202,7 +202,7 @@ For presentations, live judge walkthroughs, and end-to-end temporal verification
 - **Complete Isolation:** Zero performance overhead or behavioral deviation in production when `DEMO_MODE` is disabled.
 
 ### 🏦 Bank Statement Reconciliation
-Brightloop automates incoming wire and bank settlement reconciliation using an offline, rule-based matching engine:
+AstraFlow automates incoming wire and bank settlement reconciliation using an offline, rule-based matching engine:
 - **CSV Ingestion:** Staff upload standard CSV statements (`date`, `description`, `amount`, `reference`). Validates file type (`.csv`) and enforces a 5MB size limit.
 - **Rule-Based Matching Tiers:** Matches against confirmed unpaid invoices:
   1. **High Confidence (Auto-Reconciled):** Exact invoice number in reference + exact amount match (and customer confirmation). Automatically records payments through the payment engine and marks fully settled invoices as `Paid`.
@@ -212,7 +212,7 @@ Brightloop automates incoming wire and bank settlement reconciliation using an o
 - **Sample File Provided:** See [`docs/sample_bank_statement.csv`](file:///home/midhun/team-astrax/docs/sample_bank_statement.csv) for realistic demo transactions covering exact matches, partial deposits, customer wire transfers, unmatched refunds, and duplicate rows.
 
 ### 📊 Automated Month-End Finance Report
-At the close of each calendar month, Brightloop autonomously compiles an audit-grade executive financial report:
+At the close of each calendar month, AstraFlow autonomously compiles an audit-grade executive financial report:
 - **Automation Integration:** Step (e) in `run_daily_jobs` evaluates whether `as_of_date.day == 1`. When triggered on the 1st of any month (or simulated via the Demo Clock / "Generate Now" button), it compiles the prior month's summary.
 - **Comprehensive Executive Metrics:**
   - Active subscriptions, new subscriptions, and churned/closed subscriptions.

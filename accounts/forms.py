@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from .models import User
-from .validators import BrightloopPasswordValidator
+from .validators import AstraFlowPasswordValidator
 
 
 class CustomerSignupForm(forms.ModelForm):
@@ -55,7 +55,7 @@ class CustomerSignupForm(forms.ModelForm):
             if password != confirm_password:
                 self.add_error('confirm_password', _("Passwords do not match."))
             else:
-                validator = BrightloopPasswordValidator()
+                validator = AstraFlowPasswordValidator()
                 try:
                     validator.validate(password)
                 except ValidationError as e:
@@ -105,7 +105,7 @@ class StaffCreationForm(forms.ModelForm):
         cleaned_data = super().clean()
         password = cleaned_data.get('password')
         if password:
-            validator = BrightloopPasswordValidator()
+            validator = AstraFlowPasswordValidator()
             try:
                 validator.validate(password)
             except ValidationError as e:
@@ -207,7 +207,7 @@ class CustomerPasswordChangeForm(forms.Form):
             if new_pwd != conf_pwd:
                 self.add_error('confirm_password', _("New passwords do not match."))
             else:
-                validator = BrightloopPasswordValidator()
+                validator = AstraFlowPasswordValidator()
                 try:
                     validator.validate(new_pwd, user=self.user)
                 except ValidationError as e:

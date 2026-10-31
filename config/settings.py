@@ -108,10 +108,10 @@ DATABASES = {
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
-# Password validation per Brightloop spec (>8 chars, uppercase, lowercase, special char)
+# Password validation per AstraFlow spec (>8 chars, uppercase, lowercase, special char)
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'accounts.validators.BrightloopPasswordValidator',
+        'NAME': 'accounts.validators.AstraFlowPasswordValidator',
     },
 ]
 

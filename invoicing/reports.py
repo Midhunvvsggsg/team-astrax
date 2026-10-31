@@ -223,9 +223,9 @@ def calculate_monthly_metrics(year: int, month: int, as_of_date: Optional[date] 
 
 def email_report_to_admins(report: MonthlyReport):
     """Dispatches a clean month-end executive summary via the console email backend."""
-    subject = f"Brightloop Month-End Finance Report: {report.month_name} {report.year}"
+    subject = f"AstraFlow Month-End Finance Report: {report.month_name} {report.year}"
     body = (
-        f"BRIGHTLOOP MONTH-END FINANCE REPORT\n"
+        f"ASTRAFLOW MONTH-END FINANCE REPORT\n"
         f"Period: {report.month_name} {report.year} ({report.period_start} to {report.period_end})\n"
         f"Generated: {report.generated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
         f"--- SUBSCRIPTIONS & REVENUE ---\n"
@@ -246,7 +246,7 @@ def email_report_to_admins(report: MonthlyReport):
         name = c.get('name') or c.get('email')
         body += f"{idx}. {name} ({c.get('email')}) - ${c.get('total_paid')}\n"
 
-    body += "\nBrightloop Automated Finance Intelligence\n"
+    body += "\nAstraFlow Automated Finance Intelligence\n"
 
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'support@brightloop.local')
     admin_emails = list(User.objects.filter(role=User.Role.ADMIN, is_active=True).values_list('email', flat=True))
@@ -314,7 +314,7 @@ def generate_report_csv(report: MonthlyReport) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
 
-    writer.writerow(["BRIGHTLOOP MONTH-END FINANCE REPORT"])
+    writer.writerow(["ASTRAFLOW MONTH-END FINANCE REPORT"])
     writer.writerow(["Period", f"{report.month_name} {report.year}"])
     writer.writerow(["Date Range", f"{report.period_start} to {report.period_end}"])
     writer.writerow(["Generated At", report.generated_at.strftime("%Y-%m-%d %H:%M:%S UTC")])

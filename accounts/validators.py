@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
 
-class BrightloopPasswordValidator:
+class AstraFlowPasswordValidator:
     """
     Validates that the password:
     1. Has more than 8 characters (at least 9 characters).
