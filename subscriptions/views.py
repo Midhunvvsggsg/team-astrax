@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
 from django.db import transaction
-from accounts.decorators import staff_or_admin_required, admin_required
+from accounts.decorators import staff_or_admin_required, admin_required, customer_required
 from accounts.models import User
 from catalog.models import Product, ProductVariant, Plan
 from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory, DiscountRule
@@ -63,29 +63,36 @@ def subscription_detail(request, pk):
     """
     Detailed view of subscription:
     - Staff & Admin can view any subscription and execute actions.
-    - Customer can ONLY view their own subscription (read-only).
+    - Customer can ONLY view their own subscription (returns 404 for other customers).
+    - Exposes permitted lifecycle actions (pause, resume, renew, close) for customer.
     """
     if not request.user.is_authenticated:
         return redirect(f"/accounts/login/?next={request.path}")
 
-    subscription = get_object_or_404(
-        Subscription.objects.select_related('customer', 'plan', 'created_by')
-        .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'status_history__changed_by'),
-        pk=pk
-    )
-
-    # Enforce customer isolation
-    if request.user.is_customer and subscription.customer != request.user:
-        raise PermissionDenied("You can only access your own subscriptions.")
+    # Enforce strict customer isolation: query strictly scoped to request.user returning 404
+    if request.user.is_customer:
+        subscription = get_object_or_404(
+            Subscription.objects.filter(customer=request.user)
+            .select_related('customer', 'plan', 'created_by')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'status_history__changed_by'),
+            pk=pk
+        )
+    else:
+        subscription = get_object_or_404(
+            Subscription.objects.select_related('customer', 'plan', 'created_by')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'status_history__changed_by'),
+            pk=pk
+        )
 
     line_form = SubscriptionLineForm() if (request.user.is_staff_member or request.user.is_admin) and subscription.status in [Subscription.Status.DRAFT, Subscription.Status.QUOTATION] else None
 
     # Check which actions are available based on current status and plan flags
     available_actions = []
-    if request.user.is_staff_member or request.user.is_admin:
-        curr = subscription.status
-        today = date.today()
+    customer_actions = []
+    today = date.today()
+    curr = subscription.status
 
+    if request.user.is_staff_member or request.user.is_admin:
         if curr == Subscription.Status.DRAFT:
             available_actions.append(('quotation', 'Send Quotation', 'btn-primary'))
             available_actions.append(('confirmed', 'Confirm', 'btn-primary'))
@@ -109,6 +116,21 @@ def subscription_detail(request, pk):
         elif curr == Subscription.Status.CLOSED:
             if subscription.plan.renewable:
                 available_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
+    elif request.user.is_customer:
+        # Customer-facing actions strictly constrained by plan flags
+        if curr == Subscription.Status.ACTIVE:
+            if subscription.plan.pausable:
+                customer_actions.append(('pause', 'Pause Subscription', 'btn-secondary'))
+            if not subscription.expiry_date or today >= subscription.expiry_date or subscription.plan.closable_early:
+                customer_actions.append(('close', 'Cancel / Close Subscription', 'btn-danger'))
+            if subscription.plan.renewable:
+                customer_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
+        elif curr == Subscription.Status.PAUSED:
+            customer_actions.append(('resume', 'Resume Subscription', 'btn-primary'))
+            customer_actions.append(('close', 'Close Subscription', 'btn-danger'))
+        elif curr == Subscription.Status.CLOSED:
+            if subscription.plan.renewable:
+                customer_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
 
     return render(request, 'subscriptions/subscription_detail.html', {
         'subscription': subscription,
@@ -116,7 +138,74 @@ def subscription_detail(request, pk):
         'history': subscription.status_history.all(),
         'line_form': line_form,
         'available_actions': available_actions,
+        'customer_actions': customer_actions,
     })
+
+
+@customer_required
+def customer_subscription_action(request, pk):
+    """
+    Executes customer-requested lifecycle actions (pause, resume, renew, close)
+    strictly allowed by plan flags on their own subscription.
+    Returns 404 if subscription belongs to another customer.
+    """
+    subscription = get_object_or_404(
+        Subscription.objects.select_related('plan').filter(customer=request.user),
+        pk=pk
+    )
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip().lower()
+        today = date.today()
+
+        if action == 'pause':
+            if not subscription.plan.pausable:
+                messages.error(request, f"Plan '{subscription.plan.name}' does not permit pausing.")
+            elif subscription.status != Subscription.Status.ACTIVE:
+                messages.error(request, "Only active subscriptions can be paused.")
+            else:
+                try:
+                    subscription.transition_to(Subscription.Status.PAUSED, user=request.user, notes="Paused by customer via portal.")
+                    messages.success(request, f"Subscription {subscription.subscription_number} has been paused.")
+                except ValidationError as e:
+                    messages.error(request, str(e.message if hasattr(e, 'message') else e))
+
+        elif action == 'resume':
+            if subscription.status != Subscription.Status.PAUSED:
+                messages.error(request, "Only paused subscriptions can be resumed.")
+            else:
+                try:
+                    subscription.transition_to(Subscription.Status.ACTIVE, user=request.user, notes="Resumed by customer via portal.")
+                    messages.success(request, f"Subscription {subscription.subscription_number} has been resumed.")
+                except ValidationError as e:
+                    messages.error(request, str(e.message if hasattr(e, 'message') else e))
+
+        elif action == 'renew':
+            if not subscription.plan.renewable:
+                messages.error(request, f"Plan '{subscription.plan.name}' does not permit renewal.")
+            else:
+                try:
+                    subscription.renew(user=request.user, notes="Renewed by customer via portal.")
+                    messages.success(request, f"Subscription {subscription.subscription_number} renewed until {subscription.expiry_date}.")
+                except ValidationError as e:
+                    messages.error(request, str(e.message if hasattr(e, 'message') else e))
+
+        elif action == 'close':
+            is_valid, msg = subscription.can_transition_to(Subscription.Status.CLOSED)
+            if not is_valid:
+                messages.error(request, msg)
+            else:
+                try:
+                    subscription.transition_to(Subscription.Status.CLOSED, user=request.user, notes="Closed by customer via portal.")
+                    messages.success(request, f"Subscription {subscription.subscription_number} has been closed.")
+                except ValidationError as e:
+                    messages.error(request, str(e.message if hasattr(e, 'message') else e))
+        else:
+            messages.error(request, f"Unrecognized action '{action}'.")
+
+    next_url = request.POST.get('next', '')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('subscriptions:subscription_detail', pk=subscription.pk)
 
 @staff_or_admin_required
 def subscription_create(request):

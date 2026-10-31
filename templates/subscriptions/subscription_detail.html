@@ -55,6 +55,20 @@
           <a href="{% url 'subscriptions:subscription_delete' pk=subscription.pk %}" class="btn btn-danger">Delete Draft</a>
         {% endif %}
       </div>
+    {% elif user.is_customer and customer_actions %}
+      <!-- Customer lifecycle action controls -->
+      <div style="display: flex; gap: var(--space-8); flex-wrap: wrap; align-items: center;">
+        {% for action_code, action_label, btn_class in customer_actions %}
+          <form action="{% url 'subscriptions:customer_action' pk=subscription.pk %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="{{ action_code }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn {{ btn_class }}" {% if action_code == 'close' %}onclick="return confirm('Are you sure you want to cancel/close this subscription?');"{% elif action_code == 'renew' %}onclick="return confirm('Renew this subscription for another billing cycle?');"{% endif %}>
+              {{ action_label }}
+            </button>
+          </form>
+        {% endfor %}
+      </div>
     {% endif %}
   </div>
 
@@ -69,6 +83,10 @@
         <li style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Expiry Date:</span>
           <strong>{{ subscription.expiry_date|date:"F d, Y"|default:"Continuous / Open" }}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Next Billing Date:</span>
+          <strong>{{ subscription.next_billing_date|date:"F d, Y"|default:"None (Not active or closed)" }}</strong>
         </li>
         <li style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Payment Terms:</span>

@@ -135,6 +135,12 @@ python manage.py test
 - [x] **Sub-Second Performance Benchmark:** All platform pages respond in under 60 milliseconds with 5,000+ active records.
 - [x] **Automated Query Bounds Testing:** Integrated unit tests prevent N+1 regressions across paginated lists.
 
+### Phase 11: Customer Self-Service Portal & Strict Isolation
+- [x] **Scoped Query Isolation:** Every customer query is strictly filtered by `request.user`; any attempt to access another customer's subscription or invoice by ID returns `404 Not Found`.
+- [x] **Subscription Actions & Next Billing Date:** Shows plan name, status, upcoming billing date, expiry, and exposes permitted lifecycle actions (`Pause`, `Resume`, `Renew`, `Cancel/Close`) strictly governed by plan flags.
+- [x] **Invoices & Payment History:** Filter invoices by status (`Paid`, `Outstanding`, `Overdue`, `Draft`, `Confirmed`), view printable PDF-ready layout, and inspect recent payment transactions.
+- [x] **Profile & Password Management:** Update first/last name and unique login email; change password with real-time feedback enforcing the hackathon security rules (>8 chars, uppercase, lowercase, special char).
+
 ---
 
 ## 👥 Contributors

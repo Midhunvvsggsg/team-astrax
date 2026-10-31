@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile - Brightloop{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16);">
+  <a href="{% url 'customer_portal' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back to Portal
+  </a>
+</div>
+
+<div style="max-width: 600px; margin: 0 auto;">
+  <div class="card">
+    <div class="card-header" style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-16); margin-bottom: var(--space-24);">
+      <span class="badge badge-customer">Customer Account</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Update Profile</h1>
+      <p class="card-subtitle">Keep your personal and organization contact information up to date.</p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" style="margin-bottom: var(--space-16);">
+          {% for error in form.non_field_errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); margin-bottom: var(--space-16);">
+        <div class="form-group">
+          <label for="id_first_name" class="form-label">First Name</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <div class="form-error">
+              {% for error in form.first_name.errors %}
+                <span>{{ error }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label for="id_last_name" class="form-label">Last Name</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}
+            <div class="form-error">
+              {% for error in form.last_name.errors %}
+                <span>{{ error }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: var(--space-24);">
+        <label for="id_email" class="form-label">Email Address (Login Username) <span style="color: var(--color-danger);">*</span></label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <div class="form-error">
+            {% for error in form.email.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <small style="color: var(--color-text-muted); font-size: var(--font-size-xs); display: block; margin-top: var(--space-4);">
+          This email address is used to sign into your Brightloop customer portal and receive billing statements.
+        </small>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
+        <a href="{% url 'customer_change_password' %}" class="btn btn-secondary">
+          🔒 Change Password
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Save Profile Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

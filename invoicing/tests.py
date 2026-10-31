@@ -251,7 +251,7 @@ class InvoiceViewAndCustomerIsolationTests(TestCase):
     def test_customer_cannot_view_other_customer_invoice(self):
         self.client.force_login(self.bob)
         response = self.client.get(reverse('invoicing:invoice_detail', kwargs={'pk': self.inv_alice.pk}))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_staff_can_view_invoice_list_and_run_billing(self):
         self.client.force_login(self.staff)
@@ -421,10 +421,10 @@ class InvoiceSendAndPrintTests(TestCase):
         res_owner = self.client.get(reverse('invoicing:invoice_print', kwargs={'pk': self.invoice.pk}))
         self.assertEqual(res_owner.status_code, 200)
 
-        # 3. Another customer blocked
+        # 3. Another customer blocked (returns 404 per customer query scoping)
         self.client.force_login(self.other_customer)
         res_other = self.client.get(reverse('invoicing:invoice_print', kwargs={'pk': self.invoice.pk}))
-        self.assertEqual(res_other.status_code, 403)
+        self.assertEqual(res_other.status_code, 404)
 
 
 class InvoiceListFilterAndSearchTests(TestCase):

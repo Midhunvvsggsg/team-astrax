@@ -13,6 +13,7 @@ urlpatterns = [
     path('<int:pk>/delete/', views.subscription_delete, name='subscription_delete'),
     path('<int:pk>/transition/', views.subscription_transition, name='subscription_transition'),
     path('<int:pk>/renew/', views.subscription_renew, name='subscription_renew'),
+    path('<int:pk>/action/', views.customer_subscription_action, name='customer_action'),
 
     # Subscription Lines
     path('<int:subscription_pk>/lines/create/', views.subscription_line_create, name='line_create'),
