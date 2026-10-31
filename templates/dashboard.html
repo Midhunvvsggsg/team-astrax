@@ -1,93 +1,400 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Internal Dashboard - Brightloop{% endblock %}
+{% block title %}Finance & Revenue Dashboard - Brightloop{% endblock %}
 
 {% block content %}
-<div class="card" style="margin-bottom: var(--space-24);">
+<!-- Dashboard Header -->
+<div class="card" style="margin-bottom: var(--space-20);">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
     <div>
-      <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
-      <h1 class="card-title" style="margin-top: var(--space-8);">Welcome back, {{ user.full_name }}</h1>
-      <p class="card-subtitle">Brightloop Operations & Management Console</p>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-4);">
+        <span class="badge badge-staff">Executive Finance Intelligence</span>
+        <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
+      </div>
+      <h1 class="card-title" style="margin-top: var(--space-4);">Finance Dashboard</h1>
+      <p class="card-subtitle">Real-time SQL-aggregated analytics across subscriptions, billing, and cash collections.</p>
     </div>
-    {% if user.is_admin %}
-      <a href="{% url 'staff_management' %}" class="btn btn-primary">
-        + Manage Staff
+    <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
+      <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary">
+        ⚠️ Overdue ({{ overdue_invoice_count }})
       </a>
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">
+        💳 All Payments
+      </a>
+      <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">
+        🧾 Invoices
+      </a>
+      {% if user.is_admin %}
+        <a href="{% url 'staff_management' %}" class="btn btn-secondary">
+          👥 Staff
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Filter Toolbar -->
+  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--color-border); align-items: center;">
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">From:</label>
+      <input type="date" name="start_date" value="{{ start_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">To:</label>
+      <input type="date" name="end_date" value="{{ end_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <div style="min-width: 140px;">
+      <select name="subscription_status" class="form-select" style="padding: 6px 12px; font-size: 0.8rem;">
+        <option value="">All Subscription Statuses</option>
+        {% for code, label in subscription_statuses %}
+          <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 160px;">
+      <select name="customer" class="form-select" style="padding: 6px 12px; font-size: 0.8rem;">
+        <option value="">All Customers</option>
+        {% for c in all_customers %}
+          <option value="{{ c.pk }}" {% if customer_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.email }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 140px;">
+      <select name="plan" class="form-select" style="padding: 6px 12px; font-size: 0.8rem;">
+        <option value="">All Plans</option>
+        {% for p in all_plans %}
+          <option value="{{ p.pk }}" {% if plan_filter == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.8rem;">Filter</button>
+    {% if start_date or end_date or status_filter or customer_filter or plan_filter %}
+      <a href="{% url 'home' %}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- 5 Top Metric Cards Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-16); margin-bottom: var(--space-24);">
+  <!-- Card 1: Active Subscriptions -->
+  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-primary);">
+    <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+      Active Subscriptions
+    </div>
+    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-text); margin-top: var(--space-4);" id="metric-active-subs">
+      {{ active_subscriptions_count }}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--color-success); margin-top: var(--space-4); font-weight: 600;">
+      ● Currently generating recurring billing
+    </div>
+  </div>
+
+  <!-- Card 2: Revenue Received -->
+  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-success);">
+    <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+      Revenue Received
+    </div>
+    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-success); margin-top: var(--space-4);" id="metric-revenue-received">
+      ${{ revenue_received }}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
+      Reconciled payments collected
+    </div>
+  </div>
+
+  <!-- Card 3: Amount Still Owed -->
+  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-warning);">
+    <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+      Amount Still Owed
+    </div>
+    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-warning); margin-top: var(--space-4);" id="metric-amount-owed">
+      ${{ amount_still_owed }}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
+      Uncollected balance on open invoices
+    </div>
+  </div>
+
+  <!-- Card 4: Overdue Invoices -->
+  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-danger);">
+    <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+      Overdue Invoices
+    </div>
+    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-danger); margin-top: var(--space-4);" id="metric-overdue-count">
+      {{ overdue_invoice_count }}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--color-danger); margin-top: var(--space-4); font-weight: 600;">
+      <a href="{% url 'invoicing:overdue_list' %}" style="color: inherit; text-decoration: underline;">
+        Requires collections follow-up →
+      </a>
+    </div>
+  </div>
+
+  <!-- Card 5: Monthly Recurring Revenue (MRR) -->
+  <div class="card" style="padding: var(--space-16); border-left: 4px solid #8b5cf6;">
+    <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
+      Monthly Recurring Revenue
+    </div>
+    <div style="font-size: 1.85rem; font-weight: 800; color: #8b5cf6; margin-top: var(--space-4);" id="metric-mrr">
+      ${{ monthly_recurring_revenue }}
+    </div>
+    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
+      Normalized active subscription run-rate
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row (Loaded Locally, NO CDN, 100% Offline) -->
+<div class="grid-2" style="margin-bottom: var(--space-24);">
+  <!-- Chart 1: Revenue by Month -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Monthly Revenue Collection</h2>
+      <p class="card-subtitle">Historical cash receipts grouped by payment month</p>
+    </div>
+    <div style="position: relative; height: 260px; width: 100%;">
+      <canvas id="revenueChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart 2: Active Subscriptions by Plan -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Active Subscriptions by Plan</h2>
+      <p class="card-subtitle">Plan tier distribution across active subscriber base</p>
+    </div>
+    <div style="position: relative; height: 260px; width: 100%;">
+      <canvas id="planChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Operational Tables Row: Overdue Invoices & Recent Payments -->
+<div class="grid-2">
+  <!-- Table 1: Overdue Invoices -->
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 style="font-size: var(--font-size-base); font-weight: 700;">Overdue Invoices</h3>
+        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Due date passed & unpaid balance</p>
+      </div>
+      <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">
+        View All
+      </a>
+    </div>
+
+    {% if overdue_page_obj %}
+      <div class="table-container" style="border: none;">
+        <table class="table" style="font-size: 0.8rem;">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Customer</th>
+              <th>Days</th>
+              <th>Due</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in overdue_page_obj %}
+              <tr>
+                <td>
+                  <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" style="font-weight: 700; color: var(--color-danger);">
+                    {{ inv.invoice_number }}
+                  </a>
+                </td>
+                <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ inv.customer.email }}">
+                  {{ inv.customer.email }}
+                </td>
+                <td>
+                  <span class="badge badge-overdue" style="font-size: 0.65rem;">
+                    {{ inv.days_overdue }}d
+                  </span>
+                </td>
+                <td>
+                  <strong style="color: var(--color-danger);">${{ inv.amount_due }}</strong>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.7rem;">
+                    Record Pay
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if overdue_page_obj.has_other_pages %}
+        <div style="display: flex; justify-content: center; gap: var(--space-8); padding: var(--space-12); border-top: 1px solid var(--color-border);">
+          {% if overdue_page_obj.has_previous %}
+            <a href="?page_overdue={{ overdue_page_obj.previous_page_number }}&start_date={{ start_date }}&end_date={{ end_date }}&subscription_status={{ status_filter }}&customer={{ customer_filter }}&plan={{ plan_filter }}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">Prev</a>
+          {% endif %}
+          <span style="font-size: var(--font-size-xs); color: var(--color-text-muted); align-self: center;">
+            {{ overdue_page_obj.number }} / {{ overdue_page_obj.paginator.num_pages }}
+          </span>
+          {% if overdue_page_obj.has_next %}
+            <a href="?page_overdue={{ overdue_page_obj.next_page_number }}&start_date={{ start_date }}&end_date={{ end_date }}&subscription_status={{ status_filter }}&customer={{ customer_filter }}&plan={{ plan_filter }}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">Next</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <div style="padding: var(--space-32); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+        ✓ No overdue invoices. All accounts in good standing.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Table 2: Recent Payments -->
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 style="font-size: var(--font-size-base); font-weight: 700;">Recent Payments</h3>
+        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Latest cash collections recorded</p>
+      </div>
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">
+        View All
+      </a>
+    </div>
+
+    {% if payments_page_obj %}
+      <div class="table-container" style="border: none;">
+        <table class="table" style="font-size: 0.8rem;">
+          <thead>
+            <tr>
+              <th>Ref</th>
+              <th>Customer</th>
+              <th>Date</th>
+              <th>Method</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments_page_obj %}
+              <tr>
+                <td>
+                  <a href="{% url 'invoicing:invoice_detail' pk=p.invoice.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                    #{{ p.pk }}
+                  </a>
+                </td>
+                <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ p.invoice.customer.email }}">
+                  {{ p.invoice.customer.email }}
+                </td>
+                <td style="font-size: var(--font-size-xs); white-space: nowrap;">
+                  {{ p.date|date:"M d" }}
+                </td>
+                <td>
+                  <span class="badge" style="font-size: 0.65rem; background: rgba(99, 102, 241, 0.1); color: var(--color-primary);">
+                    {{ p.get_method_display }}
+                  </span>
+                </td>
+                <td>
+                  <strong style="color: var(--color-success); font-size: 0.85rem;">+${{ p.amount }}</strong>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if payments_page_obj.has_other_pages %}
+        <div style="display: flex; justify-content: center; gap: var(--space-8); padding: var(--space-12); border-top: 1px solid var(--color-border);">
+          {% if payments_page_obj.has_previous %}
+            <a href="?page_payments={{ payments_page_obj.previous_page_number }}&start_date={{ start_date }}&end_date={{ end_date }}&subscription_status={{ status_filter }}&customer={{ customer_filter }}&plan={{ plan_filter }}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">Prev</a>
+          {% endif %}
+          <span style="font-size: var(--font-size-xs); color: var(--color-text-muted); align-self: center;">
+            {{ payments_page_obj.number }} / {{ payments_page_obj.paginator.num_pages }}
+          </span>
+          {% if payments_page_obj.has_next %}
+            <a href="?page_payments={{ payments_page_obj.next_page_number }}&start_date={{ start_date }}&end_date={{ end_date }}&subscription_status={{ status_filter }}&customer={{ customer_filter }}&plan={{ plan_filter }}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">Next</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <div style="padding: var(--space-32); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+        No payments recorded yet matching filters.
+      </div>
     {% endif %}
   </div>
 </div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Quick Actions</h2>
-      <p class="card-subtitle">Manage Brightloop services</p>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: var(--space-16);">
-      {% if user.is_admin %}
-        <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <strong>Staff Administration</strong>
-            <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Create internal team accounts with restricted access.</p>
-          </div>
-          <a href="{% url 'staff_management' %}" class="btn btn-secondary">Open</a>
-        </div>
-      {% endif %}
-      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong>Products & Variants</strong>
-          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Configure software products, services, and attribute variants.</p>
-        </div>
-        <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">Open</a>
-      </div>
-      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong>Subscription Plans</strong>
-          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Recurring frequencies (D/W/M/Y), min quantities, and lifecycle flags.</p>
-        </div>
-        <a href="{% url 'catalog:plan_list' %}" class="btn btn-secondary">Open</a>
-      </div>
-      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong>Tax Rules</strong>
-          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Configured tax percentage rates and fixed fees for billing.</p>
-        </div>
-        <a href="{% url 'catalog:tax_list' %}" class="btn btn-secondary">Open</a>
-      </div>
-      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong>Discount Rules</strong>
-          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Percentage or fixed discounts with minimums, limits, and product scopes.</p>
-        </div>
-        <a href="{% url 'subscriptions:discount_list' %}" class="btn btn-secondary">Open</a>
-      </div>
-    </div>
-  </div>
+<!-- Chart.js Script Loaded Locally (NO CDN, 100% Offline Hackathon Compliant) -->
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // 1. Revenue by Month Chart
+    var revCanvas = document.getElementById('revenueChart');
+    if (revCanvas && typeof Chart !== 'undefined') {
+      var revLabels = {{ revenue_chart_labels|safe }};
+      var revData = {{ revenue_chart_data|safe }};
 
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Current System Status</h2>
-      <p class="card-subtitle">Operational parameters</p>
-    </div>
-    <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
-      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
-        <span style="color: var(--color-text-muted);">Active Role:</span>
-        <strong>{{ user.get_role_display }}</strong>
-      </li>
-      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
-        <span style="color: var(--color-text-muted);">Authentication Type:</span>
-        <span>Case-Insensitive Email</span>
-      </li>
-      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
-        <span style="color: var(--color-text-muted);">Email Backend:</span>
-        <span style="color: var(--color-success); font-weight: 600;">Console (Offline Ready)</span>
-      </li>
-      <li style="display: flex; justify-content: space-between;">
-        <span style="color: var(--color-text-muted);">Server Permission Enforcement:</span>
-        <span style="color: var(--color-success); font-weight: 600;">Active</span>
-      </li>
-    </ul>
-  </div>
-</div>
+      new Chart(revCanvas, {
+        type: 'bar',
+        data: {
+          labels: revLabels,
+          datasets: [{
+            label: 'Revenue ($)',
+            data: revData,
+            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(val) { return '$' + val; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Active Subscriptions by Plan Chart
+    var planCanvas = document.getElementById('planChart');
+    if (planCanvas && typeof Chart !== 'undefined') {
+      var planLabels = {{ plan_chart_labels|safe }};
+      var planData = {{ plan_chart_data|safe }};
+
+      if (planLabels.length === 0) {
+        planLabels = ['No Active Subscriptions'];
+        planData = [0];
+      }
+
+      new Chart(planCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: planLabels,
+          datasets: [{
+            data: planData,
+            backgroundColor: [
+              '#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#64748b'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, font: { size: 11 } }
+            }
+          }
+        }
+      });
+    }
+  });
+</script>
 {% endblock %}

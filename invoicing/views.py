@@ -13,6 +13,13 @@ from accounts.models import User
 from .models import Invoice, InvoiceLine, Payment
 from .forms import PaymentForm
 from .services import generate_invoices
+from .dashboard import get_finance_dashboard_context
+
+@staff_or_admin_required
+def finance_dashboard(request):
+    """Executive finance intelligence dashboard for staff and admin."""
+    context = get_finance_dashboard_context(request)
+    return render(request, 'dashboard.html', context)
 
 @staff_or_admin_required
 def invoice_list(request):

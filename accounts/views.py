@@ -11,6 +11,7 @@ from django.urls import reverse_lazy
 from .models import User
 from .forms import CustomerSignupForm, StaffCreationForm, LoginForm
 from .decorators import admin_required, customer_required, staff_or_admin_required
+from invoicing.dashboard import get_finance_dashboard_context
 
 def home_view(request):
     """Landing page and routing hub based on authentication status and role."""
@@ -18,8 +19,15 @@ def home_view(request):
         if request.user.is_customer:
             return redirect('customer_portal')
         elif request.user.is_admin or request.user.is_staff_member:
-            return render(request, 'dashboard.html', {'role': request.user.role})
+            context = get_finance_dashboard_context(request)
+            return render(request, 'dashboard.html', context)
     return render(request, 'home.html')
+
+@staff_or_admin_required
+def dashboard_view(request):
+    """Finance dashboard view for staff and admin."""
+    context = get_finance_dashboard_context(request)
+    return render(request, 'dashboard.html', context)
 
 def signup_view(request):
     """Customer registration view. Only creates customers."""
