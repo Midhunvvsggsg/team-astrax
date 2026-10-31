@@ -42,6 +42,7 @@
             <li><a href="{% url 'subscriptions:discount_list' %}" class="nav-link {% if 'discount' in request.resolver_match.url_name %}active{% endif %}">Discounts</a></li>
             {% if user.is_admin %}
               <li><a href="{% url 'staff_management' %}" class="nav-link {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">Staff Management</a></li>
+              <li><a href="{% url 'automation:dashboard' %}" class="nav-link {% if 'automation' in request.resolver_match.url_name %}active{% endif %}">Automation</a></li>
             {% endif %}
           {% endif %}
         {% endif %}

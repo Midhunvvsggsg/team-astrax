@@ -159,15 +159,45 @@ Audited via `scripts/measure_performance.py` against a database containing **5,0
 
 ---
 
+## 🤖 Automated Daily Operations & Scheduled Jobs (`run_daily_jobs`)
+
+Brightloop eliminates manual billing and operations tasks through an automated daily batch engine that runs in strict sequential order with transaction isolation per step:
+
+1. **Step (a): Recurring Billing Catch-Up:** Calls `generate_invoices` across all active subscriptions with missed billing cycles. Guaranteed idempotent via composite `(subscription, period_start)` unique constraints.
+2. **Step (b): Subscription Auto-Renewals:** Discovers active subscriptions on renewable plans (`renewable=True`) expiring within 3 days (`as_of_date <= expiry_date <= as_of_date + 3d`). Extends the expiry date by the plan's billing period and records renewal status audit history. Guaranteed idempotent: never renews twice for the same cycle.
+3. **Step (c): Auto-Closing Expired Subscriptions:** Transitions subscriptions past expiry on fixed-term plans (`auto_close_on_end=True`) to `Closed`.
+4. **Step (d): Automated Reminder Dispatch:**
+   - **Expiring Non-Renewable Subscriptions:** Dispatches email notices for active non-renewable subscriptions expiring within 7 days.
+   - **Overdue Invoices:** Dispatches urgent collection emails for confirmed invoices overdue by 3, 7, and 14 days.
+   - Persisted in the `Reminder` table with DB-level `UniqueConstraint` guards to mathematically guarantee the same reminder is never sent twice.
+
+### 📅 Production Scheduling via Cron (Recommended)
+Add the following entry to your server's crontab (`crontab -e`) to execute the daily operations every night at midnight:
+```cron
+# Brightloop Automated Daily Operations (Midnight UTC / Local)
+0 0 * * * cd /home/midhun/team-astrax && /home/midhun/team-astrax/.venv/bin/python manage.py run_daily_jobs >> /var/log/brightloop_daily_jobs.log 2>&1
+```
+
+### 🛡️ Operational Backup: Manual "Run Now" Controls
+System administrators have full operational visibility and on-demand control:
+- **Operations Dashboard:** Navigate to `/automation/` to view audit metrics, durations, error traces, and dispatched reminders. Click **"⚡ Run Daily Jobs Now"** to trigger execution on demand.
+- **Django Admin Interface:** Accessible directly from `/admin/automation/automationrun/` via the custom **"⚡ Run Daily Jobs Now"** changelist action.
+- **CLI Management Command:** Run anytime from the command line:
+  ```bash
+  python manage.py run_daily_jobs --date=YYYY-MM-DD --trigger=manual
+  ```
+
+---
+
 ## 🧪 Automated Test Suite
 
-The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, and security isolation:
+The test suite covers lifecycle state machines, permissions, billing catch-up, idempotency, mathematical boundaries, automated operations, and security isolation:
 
 ```bash
 python manage.py test
 ```
 ```text
-Ran 134 tests in 50.459s - OK (134/134 passing)
+Ran 141 tests in 56.062s - OK (141/141 passing)
 ```
 
 ---

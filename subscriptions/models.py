@@ -310,7 +310,7 @@ class Subscription(models.Model):
         )
 
     @transaction.atomic
-    def renew(self, user=None, extension_days=None, notes=""):
+    def renew(self, user=None, extension_days=None, notes="", base_date=None):
         """Renews subscription if plan.renewable is allowed."""
         if not self.plan.renewable:
             raise ValidationError(_(f"Plan '{self.plan.name}' cannot be renewed (renewable flag is False)."))
@@ -329,8 +329,12 @@ class Subscription(models.Model):
         else:
             days = 30
 
-        base_date = max(self.expiry_date or date.today(), date.today())
-        self.expiry_date = base_date + timedelta(days=days)
+        if base_date is None:
+            calc_base = max(self.expiry_date or date.today(), date.today())
+        else:
+            calc_base = max(self.expiry_date or base_date, base_date)
+
+        self.expiry_date = calc_base + timedelta(days=days)
         old_status = self.status
         self.status = self.Status.ACTIVE
         self.save()

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Automated Daily Operations - Brightloop{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16); margin-bottom: var(--space-24);">
+  <div>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol style="list-style: none; display: flex; gap: var(--space-8); padding: 0; margin: 0 0 var(--space-8) 0; font-size: var(--font-size-xs);">
+        <li><a href="{% url 'home' %}">Dashboard</a></li>
+        <li style="color: var(--color-text-muted);">/</li>
+        <li style="color: var(--color-text-muted);">Automation Operations</li>
+      </ol>
+    </nav>
+    <h1 style="font-size: var(--font-size-2xl); font-weight: 700; margin: 0; color: var(--color-text-main);">
+      Automated Daily Operations
+    </h1>
+    <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin: var(--space-4) 0 0 0;">
+      Execution logs and status metrics for recurring billing catch-up, auto-renewals, auto-close, and reminders.
+    </p>
+  </div>
+  <div>
+    <form action="{% url 'automation:run_now' %}" method="post" style="display: inline;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'automation:dashboard' %}">
+      <button type="submit" class="btn btn-primary" onclick="return confirm('Execute all daily automated jobs right now?');">
+        ⚡ Run Daily Jobs Now
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Automation Runs History Table -->
+<div class="card" style="margin-bottom: var(--space-32);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-16);">
+    <div>
+      <h2 class="card-title">Automation Run History</h2>
+      <p class="card-subtitle">Detailed audit records of past automated scheduler and manual executions</p>
+    </div>
+    <span class="badge" style="background: var(--color-surface-muted);">{{ total_runs }} Total Runs</span>
+  </div>
+
+  {% if page_obj %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Run ID</th>
+            <th>Trigger</th>
+            <th>Started At</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th>Invoices</th>
+            <th>Renewals</th>
+            <th>Closed</th>
+            <th>Reminders</th>
+            <th>Initiated By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in page_obj %}
+            <tr>
+              <td><strong>#{{ run.id }}</strong></td>
+              <td>
+                <span class="badge" style="background: {% if run.trigger == 'manual' %}#e0f2fe; color:#0369a1{% else %}var(--color-surface-muted){% endif %};">
+                  {{ run.get_trigger_display }}
+                </span>
+              </td>
+              <td style="font-size: var(--font-size-xs);">{{ run.started_at|date:"Y-m-d H:i:s" }}</td>
+              <td style="font-size: var(--font-size-xs);">{{ run.duration_seconds }}s</td>
+              <td>
+                {% if run.status == 'success' %}
+                  <span class="badge badge-active">Success</span>
+                {% elif run.status == 'partial' %}
+                  <span class="badge badge-paused">Partial Failure</span>
+                {% else %}
+                  <span class="badge badge-closed">Failed</span>
+                {% endif %}
+              </td>
+              <td>{{ run.invoices_created }}</td>
+              <td>{{ run.renewals_made }}</td>
+              <td>{{ run.subscriptions_closed }}</td>
+              <td>{{ run.reminders_sent }}</td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ run.initiated_by.email|default:"System Cron" }}
+              </td>
+            </tr>
+            {% if run.errors %}
+              <tr>
+                <td colspan="10" style="background: #fff1f2; color: #9f1239; font-size: var(--font-size-xs); padding: var(--space-8) var(--space-16);">
+                  <strong>Logged Warnings/Errors:</strong>
+                  <pre style="margin: var(--space-4) 0 0 0; white-space: pre-wrap; font-family: monospace;">{{ run.errors }}</pre>
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+      <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-16);">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">← Previous</a>
+        {% endif %}
+        <span style="font-size: var(--font-size-sm); align-self: center; color: var(--color-text-muted);">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Next →</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="empty-state" style="padding: var(--space-32);">
+      <p style="color: var(--color-text-muted); margin-bottom: var(--space-16);">No automation runs have been executed yet.</p>
+      <form action="{% url 'automation:run_now' %}" method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Run First Automation Now</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Recent Reminders Dispatched -->
+<div class="card">
+  <div style="margin-bottom: var(--space-16);">
+    <h2 class="card-title">Recent Automated Reminders Dispatched</h2>
+    <p class="card-subtitle">Audited record of non-renewable expiry and overdue invoice notices sent to customers</p>
+  </div>
+
+  {% if recent_reminders %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Recipient</th>
+            <th>Referenced Record</th>
+            <th>Target Date</th>
+            <th>Sent At</th>
+            <th>Subject</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rem in recent_reminders %}
+            <tr>
+              <td>
+                <span class="badge" style="background: var(--color-surface-muted);">
+                  {{ rem.get_reminder_type_display }}
+                </span>
+              </td>
+              <td><strong>{{ rem.recipient.email }}</strong></td>
+              <td>
+                {% if rem.subscription %}
+                  <a href="{% url 'subscriptions:subscription_detail' pk=rem.subscription.pk %}">
+                    {{ rem.subscription.subscription_number }}
+                  </a>
+                {% elif rem.invoice %}
+                  <a href="{% url 'invoicing:invoice_detail' pk=rem.invoice.pk %}">
+                    {{ rem.invoice.invoice_number }}
+                  </a>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs);">{{ rem.target_date }}</td>
+              <td style="font-size: var(--font-size-xs);">{{ rem.sent_at|date:"Y-m-d H:i" }}</td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ rem.subject }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state" style="padding: var(--space-24);">
+      <p style="color: var(--color-text-muted); margin: 0;">No automated reminders have been generated yet.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
