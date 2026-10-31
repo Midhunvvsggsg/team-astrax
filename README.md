@@ -104,3 +104,12 @@ python manage.py test
 - [x] **Scope Granularity:** Supports both whole-subscription discounts and specific product line discounts.
 - [x] **Reusable Evaluation Service:** `get_applicable_discounts(subscription, billing_date)` checks active status, dates, limits, minimums, and scope; guarantees percentage $\le 100\%$ and caps fixed discounts at eligible amount (never negative).
 - [x] **Admin-Only Management & Staff Read-Only:** Admin CRUD with client/server validation; Staff can inspect rules and eligibility; Customers forbidden.
+
+### Phase 6: Automated Recurring Billing & Invoice Generation
+- [x] **Invoicing Models:** `Invoice` and `InvoiceLine` with sequential numbering (`INV-00001`), payment due dates from terms, statuses (`Draft`, `Confirmed`, `Paid`, `Cancelled`), and financial totals.
+- [x] **Concurrency & Idempotency Guarantee:** DB-level unique constraint on `(subscription, period_start)` ensures double billing is physically impossible.
+- [x] **Automated Catch-Up Engine:** `generate_invoices(as_of_date)` identifies all active subscriptions, automatically detects all unbilled and missed past periods, and generates sequential invoices in chronological order.
+- [x] **Taxes & Applied Discounts:** Prefills line items, calculates taxes from active tax rules, applies eligible discounts via `get_applicable_discounts`, and increments discount `times_used` exactly once.
+- [x] **Robust Month-End Handling:** Automatically clamps next billing dates to calendar month-ends (e.g. Jan 31 $\rightarrow$ Feb 28, Feb 29 on leap years).
+- [x] **Interactive & CLI Billing Run:** Admin/Staff "Run Billing Engine" web button with customizable target date, plus `python manage.py generate_invoices` command with created/skipped/failed metrics.
+- [x] **Printable Invoices:** Clean `@media print` layout ready for PDF export or paper printing.
