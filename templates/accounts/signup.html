@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Customer Account - Brightloop{% endblock %}
+
+{% block content %}
+<div style="max-width: 520px; margin: 0 auto;">
+  <div class="card">
+    <div class="card-header">
+      <h1 class="card-title">Create Customer Account</h1>
+      <p class="card-subtitle">Sign up to manage your Brightloop subscriptions and invoices</p>
+    </div>
+
+    <form method="post" id="signupForm" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" style="margin-bottom: var(--space-16);">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="{{ form.first_name.id_for_label }}">First Name</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <div class="form-error">{{ form.first_name.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="{{ form.last_name.id_for_label }}">Last Name</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}
+            <div class="form-error">{{ form.last_name.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.email.id_for_label }}">Email Address *</label>
+        {{ form.email }}
+        <p class="form-help">Unique per account (case-insensitive).</p>
+        {% if form.email.errors %}
+          <div class="form-error">{{ form.email.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.password.id_for_label }}">Password *</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="form-error">{{ form.password.errors.0 }}</div>
+        {% endif %}
+
+        <!-- Client-side instant feedback checklist -->
+        <ul class="password-requirements" id="passwordChecklist">
+          <li class="password-rule invalid" id="rule-length">
+            <span class="icon">○</span> More than 8 characters (at least 9)
+          </li>
+          <li class="password-rule invalid" id="rule-upper">
+            <span class="icon">○</span> At least one uppercase letter (A-Z)
+          </li>
+          <li class="password-rule invalid" id="rule-lower">
+            <span class="icon">○</span> At least one lowercase letter (a-z)
+          </li>
+          <li class="password-rule invalid" id="rule-special">
+            <span class="icon">○</span> At least one special character (!@#$%^&*)
+          </li>
+        </ul>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.confirm_password.id_for_label }}">Confirm Password *</label>
+        {{ form.confirm_password }}
+        <div class="form-error" id="matchError" style="display: none;">Passwords do not match.</div>
+        {% if form.confirm_password.errors %}
+          <div class="form-error">{{ form.confirm_password.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div style="margin-top: var(--space-24);">
+        <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%;">
+          Create Customer Account
+        </button>
+      </div>
+
+      <p style="text-align: center; margin-top: var(--space-16); font-size: var(--font-size-sm); color: var(--color-text-muted);">
+        Already have an account? <a href="{% url 'login' %}">Sign in here</a>
+      </p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const passwordInput = document.getElementById('id_password');
+  const confirmPasswordInput = document.getElementById('id_confirm_password');
+  const matchError = document.getElementById('matchError');
+
+  const ruleLength = document.getElementById('rule-length');
+  const ruleUpper = document.getElementById('rule-upper');
+  const ruleLower = document.getElementById('rule-lower');
+  const ruleSpecial = document.getElementById('rule-special');
+
+  function updateRule(element, isValid) {
+    if (isValid) {
+      element.classList.remove('invalid');
+      element.classList.add('valid');
+      element.querySelector('.icon').textContent = '✓';
+    } else {
+      element.classList.remove('valid');
+      element.classList.add('invalid');
+      element.querySelector('.icon').textContent = '○';
+    }
+  }
+
+  function validateClientPassword() {
+    const val = passwordInput.value;
+    
+    // Rule 1: More than 8 characters (at least 9)
+    const hasLength = val.length > 8;
+    updateRule(ruleLength, hasLength);
+
+    // Rule 2: At least one uppercase
+    const hasUpper = /[A-Z]/.test(val);
+    updateRule(ruleUpper, hasUpper);
+
+    // Rule 3: At least one lowercase
+    const hasLower = /[a-z]/.test(val);
+    updateRule(ruleLower, hasLower);
+
+    // Rule 4: At least one special character
+    const hasSpecial = /[^A-Za-z0-9]/.test(val);
+    updateRule(ruleSpecial, hasSpecial);
+
+    // Password match check
+    if (confirmPasswordInput.value.length > 0) {
+      if (val !== confirmPasswordInput.value) {
+        matchError.style.display = 'block';
+      } else {
+        matchError.style.display = 'none';
+      }
+    } else {
+      matchError.style.display = 'none';
+    }
+  }
+
+  passwordInput.addEventListener('input', validateClientPassword);
+  confirmPasswordInput.addEventListener('input', validateClientPassword);
+</script>
+{% endblock %}

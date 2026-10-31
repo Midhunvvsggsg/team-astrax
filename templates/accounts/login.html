@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign In - Brightloop{% endblock %}
+
+{% block content %}
+<div style="max-width: 440px; margin: 0 auto;">
+  <div class="card">
+    <div class="card-header">
+      <h1 class="card-title">Sign In</h1>
+      <p class="card-subtitle">Access your account (Admin, Staff, or Customer)</p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" style="margin-bottom: var(--space-16);">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.email.id_for_label }}">Email Address</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <div class="form-error">{{ form.email.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+          <label class="form-label" for="{{ form.password.id_for_label }}" style="margin-bottom: 0;">Password</label>
+          <a href="{% url 'password_reset' %}" style="font-size: var(--font-size-xs);">Forgot password?</a>
+        </div>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="form-error">{{ form.password.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div style="margin-top: var(--space-24);">
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Sign In
+        </button>
+      </div>
+
+      <p style="text-align: center; margin-top: var(--space-16); font-size: var(--font-size-sm); color: var(--color-text-muted);">
+        Don't have an account? <a href="{% url 'signup' %}">Create customer account</a>
+      </p>
+    </form>
+  </div>
+</div>
+{% endblock %}
