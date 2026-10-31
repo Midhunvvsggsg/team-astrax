@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Variant - {{ variant.attribute }}: {{ variant.value }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 0 auto;">
+  <div style="margin-bottom: var(--space-16);">
+    <a href="{% url 'catalog:product_detail' pk=product.pk %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+      ← Back to {{ product.name }}
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h1 class="card-title">Edit Pricing Variant</h1>
+      <p class="card-subtitle">For product: <strong>{{ product.name }}</strong> (Base: ${{ product.sales_price }})</p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.attribute.id_for_label }}">Attribute Name *</label>
+        {{ form.attribute }}
+        {% if form.attribute.errors %}
+          <div class="form-error">{{ form.attribute.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.value.id_for_label }}">Attribute Value *</label>
+        {{ form.value }}
+        {% if form.value.errors %}
+          <div class="form-error">{{ form.value.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.extra_price.id_for_label }}">Extra Price ($) *</label>
+        {{ form.extra_price }}
+        <p class="form-help">Amount added on top of base sales price.</p>
+        {% if form.extra_price.errors %}
+          <div class="form-error">{{ form.extra_price.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group" style="display: flex; align-items: center; gap: var(--space-8);">
+        {{ form.is_active }}
+        <label class="form-label" for="{{ form.is_active.id_for_label }}" style="margin-bottom: 0;">Active Variant</label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: var(--space-16); margin-top: var(--space-24);">
+        <a href="{% url 'catalog:product_detail' pk=product.pk %}" class="btn btn-secondary">
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Save Variant
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

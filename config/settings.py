@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     
     # Project apps
     'accounts',
+    'catalog',
 ]
 
 MIDDLEWARE = [

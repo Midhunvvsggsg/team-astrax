@@ -36,10 +36,24 @@
       {% endif %}
       <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <strong>Subscription Catalog & Billing</strong>
-          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Products, plans, quotation templates, and recurring billing jobs.</p>
+          <strong>Products & Variants</strong>
+          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Configure software products, services, and attribute variants.</p>
         </div>
-        <span class="badge" style="background: #e2e8f0; color: #475569;">Ready for Phase 3</span>
+        <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">Open</a>
+      </div>
+      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>Subscription Plans</strong>
+          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Recurring frequencies (D/W/M/Y), min quantities, and lifecycle flags.</p>
+        </div>
+        <a href="{% url 'catalog:plan_list' %}" class="btn btn-secondary">Open</a>
+      </div>
+      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>Tax Rules</strong>
+          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Configured tax percentage rates and fixed fees for billing.</p>
+        </div>
+        <a href="{% url 'catalog:tax_list' %}" class="btn btn-secondary">Open</a>
       </div>
     </div>
   </div>

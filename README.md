@@ -70,11 +70,20 @@ python manage.py test
 
 ---
 
-## 📐 Implemented in Phase 2
+## 📐 Implemented Features
 
+### Phase 2: Scaffolding, RBAC & Authentication
 - [x] **Custom User Model:** Unique case-insensitive email login, three distinct roles (`admin`, `staff`, `customer`).
 - [x] **Customer Signup:** Strictly registers customers only; instant client-side validation checklist + server-side enforcement (>8 characters, uppercase, lowercase, special character).
 - [x] **Authentication:** Case-insensitive email login, logout, and password reset via `console.EmailBackend`.
 - [x] **Server-Enforced RBAC:** `@admin_required`, `@staff_or_admin_required`, and `@customer_required` decorators and CBV mixins.
 - [x] **Admin Staff Console:** Admin-only view to provision internal operational staff members.
 - [x] **Unified Theme System:** Responsive layout with centralized design tokens (`static/css/theme.css`), active-link navbar, loading spinners, empty states, and field-level error messages.
+
+### Phase 3: Product Catalog, Variants, Taxes & Plans
+- [x] **Products & Pricing:** Name, type, Decimal sales price, Decimal cost price, notes, active status.
+- [x] **Pricing Variants:** Attributes (e.g. Brand) and values (e.g. Odoo) with extra prices (e.g. +$560.00). Dynamic property calculates final price (`base + extra`).
+- [x] **Tax Engine Rules:** Admin-configured taxes with percentage rates, optional fixed fees, and automatic tax calculation helper.
+- [x] **Subscription Plans:** Daily, Weekly, Monthly, and Yearly billing periods, minimum seat quantity, date availability windows, and lifecycle flags (`auto_close_on_end`, `closable_early`, `pausable`, `renewable`).
+- [x] **Strict Role Permissions:** Admin-only create/edit/delete; Staff view-only access; Customers blocked.
+- [x] **Performance & UX:** Search, filter, pagination (10 items/page), and database indexes on commonly queried fields.

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Subscription Plans - Brightloop Catalog{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Plans</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Subscription Plans</h1>
+      <p class="card-subtitle">Define recurring billing intervals, minimum quantities, and lifecycle behaviors.</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:plan_create' %}" class="btn btn-primary">+ Add Plan</a>
+    {% endif %}
+  </div>
+
+  <!-- Search & Filters -->
+  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search plans by name...">
+    </div>
+    <div style="min-width: 150px;">
+      <select name="period" class="form-select">
+        <option value="">All Periods</option>
+        {% for code, label in billing_periods %}
+          <option value="{{ code }}" {% if period_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 130px;">
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or period_filter or status_filter %}
+      <a href="{% url 'catalog:plan_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Plan Name</th>
+            <th>Price / Frequency</th>
+            <th>Min Qty</th>
+            <th>Availability</th>
+            <th>Lifecycle Flags</th>
+            <th>Status</th>
+            {% if user.is_admin %}<th style="text-align: right;">Actions</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for plan in page_obj %}
+            <tr>
+              <td><strong>{{ plan.name }}</strong></td>
+              <td>
+                <strong style="color: var(--color-primary);">${{ plan.price }}</strong>
+                <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);"> / {{ plan.get_billing_period_display }}</span>
+              </td>
+              <td>{{ plan.minimum_quantity }} seat{{ plan.minimum_quantity|pluralize }}</td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {% if plan.available_from or plan.available_to %}
+                  {{ plan.available_from|default:"Start" }} → {{ plan.available_to|default:"Ongoing" }}
+                {% else %}
+                  Always Available
+                {% endif %}
+              </td>
+              <td>
+                <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+                  {% if plan.auto_close_on_end %}
+                    <span class="badge" style="background: #fef3c7; color: #92400e;" title="Auto closes when term ends">Auto-Close</span>
+                  {% endif %}
+                  {% if plan.closable_early %}
+                    <span class="badge" style="background: var(--color-surface-muted);" title="Customer/staff can cancel early">Closable</span>
+                  {% endif %}
+                  {% if plan.pausable %}
+                    <span class="badge" style="background: var(--color-surface-muted);" title="Can pause and resume">Pausable</span>
+                  {% endif %}
+                  {% if plan.renewable %}
+                    <span class="badge" style="background: var(--color-surface-muted);" title="Can renew">Renewable</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                {% if plan.is_active %}
+                  <span class="badge badge-customer">Active</span>
+                {% else %}
+                  <span class="badge badge-admin">Inactive</span>
+                {% endif %}
+              </td>
+              {% if user.is_admin %}
+                <td style="text-align: right;">
+                  <a href="{% url 'catalog:plan_edit' pk=plan.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Edit</a>
+                  <a href="{% url 'catalog:plan_delete' pk=plan.pk %}" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Delete</a>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&period={{ period_filter }}&status={{ status_filter }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&period={{ period_filter }}&status={{ status_filter }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📅</div>
+    <h3 class="empty-state-title">No Plans Found</h3>
+    <p class="empty-state-desc">
+      {% if search_query or period_filter or status_filter %}
+        No plans match your current search/filter parameters.
+      {% else %}
+        No recurring billing plans have been created yet.
+      {% endif %}
+    </p>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:plan_create' %}" class="btn btn-primary">+ Add First Plan</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

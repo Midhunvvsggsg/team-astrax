@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.name }} - Product Details{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16);">
+  <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back to Products
+  </a>
+</div>
+
+<!-- Product Info Header -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+        <span class="badge" style="background: var(--color-surface-muted);">{{ product.get_product_type_display }}</span>
+        {% if product.is_active %}
+          <span class="badge badge-customer">Active</span>
+        {% else %}
+          <span class="badge badge-admin">Inactive</span>
+        {% endif %}
+      </div>
+      <h1 class="card-title">{{ product.name }}</h1>
+      <p class="card-subtitle">Created on {{ product.created_at|date:"M d, Y" }}</p>
+    </div>
+
+    {% if user.is_admin %}
+      <div style="display: flex; gap: var(--space-8);">
+        <a href="{% url 'catalog:product_edit' pk=product.pk %}" class="btn btn-primary">Edit Product</a>
+        <a href="{% url 'catalog:product_delete' pk=product.pk %}" class="btn btn-danger">Delete</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="grid-2" style="margin-top: var(--space-24); border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
+    <div>
+      <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase;">Base Sales Price</p>
+      <p style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-primary);">${{ product.sales_price }}</p>
+    </div>
+    <div>
+      <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase;">Cost Price</p>
+      <p style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text-muted);">${{ product.cost_price }}</p>
+    </div>
+  </div>
+
+  {% if product.notes %}
+    <div style="margin-top: var(--space-16); padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md);">
+      <strong>Notes & Specifications:</strong>
+      <p style="margin-top: var(--space-4); color: var(--color-text);">{{ product.notes|linebreaks }}</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Product Variants Section -->
+<div class="grid-2">
+  <!-- Variants List -->
+  <div class="card" style="{% if not user.is_admin %}grid-column: 1 / -1;{% endif %}">
+    <div class="card-header">
+      <h2 class="card-title">Pricing Variants ({{ variants.count }})</h2>
+      <p class="card-subtitle">Configured attribute variations and price adjustments</p>
+    </div>
+
+    {% if variants %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Attribute</th>
+              <th>Value</th>
+              <th>Extra Price</th>
+              <th>Final Price</th>
+              {% if user.is_admin %}<th style="text-align: right;">Action</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for variant in variants %}
+              <tr>
+                <td><strong>{{ variant.attribute }}</strong></td>
+                <td><span class="badge" style="background: var(--color-surface-muted);">{{ variant.value }}</span></td>
+                <td style="color: var(--color-success); font-weight: 600;">+${{ variant.extra_price }}</td>
+                <td><strong style="color: var(--color-primary);">${{ variant.final_price }}</strong></td>
+                {% if user.is_admin %}
+                  <td style="text-align: right;">
+                    <a href="{% url 'catalog:variant_edit' pk=variant.pk %}" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.7rem;">Edit</a>
+                    <a href="{% url 'catalog:variant_delete' pk=variant.pk %}" class="btn btn-danger" style="padding: 2px 6px; font-size: 0.7rem;">✕</a>
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">🏷️</div>
+        <h3 class="empty-state-title">No Variants Added</h3>
+        <p class="empty-state-desc">
+          This product uses standard base pricing. Add variants (e.g. Brand=Odoo adds $560.00) to configure options.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Add Variant Form (Admin Only) -->
+  {% if user.is_admin and variant_form %}
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Add Variant</h2>
+        <p class="card-subtitle">E.g., Brand = Odoo adds +$560.00 to sales price</p>
+      </div>
+
+      <form action="{% url 'catalog:variant_create' product_pk=product.pk %}" method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label">Attribute Name *</label>
+          {{ variant_form.attribute }}
+          <p class="form-help">e.g. Brand, Tier, Storage, Edition</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Attribute Value *</label>
+          {{ variant_form.value }}
+          <p class="form-help">e.g. Odoo, Enterprise, 100GB, Pro</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Extra Price ($) *</label>
+          {{ variant_form.extra_price }}
+          <p class="form-help">Amount added on top of base ${{ product.sales_price }}</p>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: var(--space-8);">
+          {{ variant_form.is_active }}
+          <label class="form-label" style="margin-bottom: 0;">Active</label>
+        </div>
+
+        <div style="margin-top: var(--space-16);">
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            + Add Variant
+          </button>
+        </div>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
