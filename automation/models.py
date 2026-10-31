@@ -25,6 +25,7 @@ class AutomationRun(models.Model):
     renewals_made = models.PositiveIntegerField(_('renewals made'), default=0)
     subscriptions_closed = models.PositiveIntegerField(_('subscriptions closed'), default=0)
     reminders_sent = models.PositiveIntegerField(_('reminders sent'), default=0)
+    reports_generated = models.PositiveIntegerField(_('reports generated'), default=0)
 
     duration_seconds = models.DecimalField(
         _('duration (seconds)'),

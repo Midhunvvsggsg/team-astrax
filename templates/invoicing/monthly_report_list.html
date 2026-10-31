@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Month-End Finance Reports - Brightloop{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16); margin-bottom: var(--space-24);">
+  <div>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol style="list-style: none; display: flex; gap: var(--space-8); padding: 0; margin: 0 0 var(--space-8) 0; font-size: var(--font-size-xs);">
+        <li><a href="{% url 'home' %}">Dashboard</a></li>
+        <li style="color: var(--color-text-muted);">/</li>
+        <li><a href="{% url 'invoicing:invoice_list' %}">Invoices</a></li>
+        <li style="color: var(--color-text-muted);">/</li>
+        <li style="color: var(--color-text-muted);">Finance Reports</li>
+      </ol>
+    </nav>
+    <h1 style="font-size: var(--font-size-2xl); font-weight: 700; margin: 0; color: var(--color-text-main);">
+      Month-End Finance Reports
+    </h1>
+    <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin: var(--space-4) 0 0 0;">
+      Automated executive intelligence: active subscriptions, MRR, cash collections, aged debt, and top revenue drivers.
+    </p>
+  </div>
+</div>
+
+<!-- Manual Generation Card -->
+<div class="card" style="margin-bottom: var(--space-24); border-left: 4px solid var(--color-primary);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div style="max-width: 650px;">
+      <h2 class="card-title" style="margin-bottom: var(--space-4);">Automated Month-End Compilation</h2>
+      <p class="card-subtitle" style="margin-bottom: var(--space-12);">
+        The daily automation engine compiles the previous month's financial metrics on the <strong>1st of each month at 00:00 UTC</strong> and dispatches an email summary to admins. Each period report is stored in <code>MonthlyReport</code> and preserved idempotently.
+      </p>
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+        ⏱️ Current Simulated/System Date: <strong>{{ today|date:"Y-m-d" }}</strong>
+      </div>
+    </div>
+
+    <!-- Generate Form -->
+    <form action="{% url 'invoicing:report_generate' %}" method="post" style="display: flex; align-items: flex-end; gap: var(--space-12); flex-wrap: wrap;">
+      {% csrf_token %}
+      <div>
+        <label for="report_year" style="display: block; font-size: var(--font-size-xs); font-weight: 600; margin-bottom: 2px;">Year</label>
+        <input type="number" id="report_year" name="year" value="{{ default_year }}" min="2020" max="2035" style="width: 90px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 4px;" required>
+      </div>
+      <div>
+        <label for="report_month" style="display: block; font-size: var(--font-size-xs); font-weight: 600; margin-bottom: 2px;">Month</label>
+        <select id="report_month" name="month" style="padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 4px; background: #fff;" required>
+          <option value="1" {% if default_month == 1 %}selected{% endif %}>January (01)</option>
+          <option value="2" {% if default_month == 2 %}selected{% endif %}>February (02)</option>
+          <option value="3" {% if default_month == 3 %}selected{% endif %}>March (03)</option>
+          <option value="4" {% if default_month == 4 %}selected{% endif %}>April (04)</option>
+          <option value="5" {% if default_month == 5 %}selected{% endif %}>May (05)</option>
+          <option value="6" {% if default_month == 6 %}selected{% endif %}>June (06)</option>
+          <option value="7" {% if default_month == 7 %}selected{% endif %}>July (07)</option>
+          <option value="8" {% if default_month == 8 %}selected{% endif %}>August (08)</option>
+          <option value="9" {% if default_month == 9 %}selected{% endif %}>September (09)</option>
+          <option value="10" {% if default_month == 10 %}selected{% endif %}>October (10)</option>
+          <option value="11" {% if default_month == 11 %}selected{% endif %}>November (11)</option>
+          <option value="12" {% if default_month == 12 %}selected{% endif %}>December (12)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="height: 34px; padding: 0 16px; font-size: var(--font-size-sm); display: flex; align-items: center; gap: 6px;">
+        ⚡ Generate Now
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if latest_report %}
+<!-- Latest Report Quick Highlight -->
+<div class="card" style="margin-bottom: var(--space-24); background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #cbd5e1;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12); margin-bottom: var(--space-16);">
+    <div>
+      <span class="badge" style="background: var(--color-primary); color: #fff; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; font-weight: 700; margin-bottom: 4px; display: inline-block;">
+        Latest Period
+      </span>
+      <h3 style="margin: 0; font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text-main);">
+        {{ latest_report.month_name }} {{ latest_report.year }} Financial Snapshot
+      </h3>
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+        {{ latest_report.period_start }} to {{ latest_report.period_end }} • Generated {{ latest_report.generated_at|date:"Y-m-d H:i" }} UTC
+      </div>
+    </div>
+    <div style="display: flex; gap: var(--space-8);">
+      <a href="{% url 'invoicing:report_detail' pk=latest_report.pk %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8125rem;">
+        View Full Report →
+      </a>
+      <a href="{% url 'invoicing:report_csv' pk=latest_report.pk %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8125rem;">
+        📥 Download CSV
+      </a>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-12);">
+    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">ACTIVE SUBS</div>
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text-main); margin-top: 2px;">
+        {{ latest_report.active_subscriptions }}
+      </div>
+      <div style="font-size: 11px; color: var(--color-text-muted);">+{{ latest_report.new_subscriptions }} new / -{{ latest_report.closed_subscriptions }} closed</div>
+    </div>
+
+    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">MRR</div>
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #2563eb; margin-top: 2px;">
+        ${{ latest_report.mrr }}
+      </div>
+      <div style="font-size: 11px; color: var(--color-text-muted);">Recurring revenue pace</div>
+    </div>
+
+    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">REVENUE RECEIVED</div>
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #16a34a; margin-top: 2px;">
+        ${{ latest_report.revenue_received }}
+      </div>
+      <div style="font-size: 11px; color: var(--color-text-muted);">Collected in period</div>
+    </div>
+
+    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">AMOUNT OWED</div>
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #d97706; margin-top: 2px;">
+        ${{ latest_report.amount_still_owed }}
+      </div>
+      <div style="font-size: 11px; color: var(--color-text-muted);">Unpaid issued invoices</div>
+    </div>
+
+    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">TOTAL OVERDUE</div>
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #dc2626; margin-top: 2px;">
+        ${{ latest_report.total_overdue_amount }}
+      </div>
+      <div style="font-size: 11px; color: var(--color-text-muted);">{{ latest_report.total_overdue_count }} overdue invoices</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Reports Table -->
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-16);">
+    <div>
+      <h2 class="card-title">Archived Monthly Reports</h2>
+      <p class="card-subtitle">Historical month-end finance reports stored in the database</p>
+    </div>
+    <span class="badge" style="background: var(--color-surface-muted);">{{ total_reports }} Reports</span>
+  </div>
+
+  {% if page_obj %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Date Range</th>
+            <th>Active Subs</th>
+            <th>MRR</th>
+            <th>Revenue Received</th>
+            <th>Amount Owed</th>
+            <th>Total Overdue</th>
+            <th>Generated</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'invoicing:report_detail' pk=r.pk %}" style="font-weight: 700; color: var(--color-primary); text-decoration: none;">
+                  {{ r.month_name }} {{ r.year }}
+                </a>
+              </td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ r.period_start }} to {{ r.period_end }}
+              </td>
+              <td>{{ r.active_subscriptions }}</td>
+              <td style="font-weight: 600; color: #2563eb;">${{ r.mrr }}</td>
+              <td style="font-weight: 600; color: #16a34a;">${{ r.revenue_received }}</td>
+              <td style="color: #d97706;">${{ r.amount_still_owed }}</td>
+              <td>
+                {% if r.total_overdue_count > 0 %}
+                  <span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 600;">
+                    ${{ r.total_overdue_amount }} ({{ r.total_overdue_count }})
+                  </span>
+                {% else %}
+                  <span style="color: #16a34a; font-size: var(--font-size-xs); font-weight: 600;">$0.00</span>
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ r.generated_at|date:"Y-m-d H:i" }}
+              </td>
+              <td style="text-align: right; white-space: nowrap;">
+                <a href="{% url 'invoicing:report_detail' pk=r.pk %}" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;">
+                  View
+                </a>
+                <a href="{% url 'invoicing:report_csv' pk=r.pk %}" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;">
+                  📥 CSV
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+      <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-16);">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">← Previous</a>
+        {% endif %}
+        <span style="font-size: var(--font-size-sm); align-self: center; color: var(--color-text-muted);">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Next →</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="empty-state" style="padding: var(--space-32); text-align: center;">
+      <p style="color: var(--color-text-muted); margin: 0 0 var(--space-12) 0;">No month-end reports generated yet.</p>
+      <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0;">Click "Generate Now" above or wait for the 1st of the month automation run.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

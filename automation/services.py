@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from invoicing.models import Invoice
+from invoicing.reports import generate_monthly_report
 from invoicing.services import generate_invoices
 from subscriptions.models import Subscription, SubscriptionStatusHistory
 
@@ -251,6 +252,31 @@ def execute_daily_jobs(
         errors.append(f"Step (d) Reminders workflow error: {str(e)}")
 
     # --------------------------------------------------------------------------
+    # Step (e): Month-End Finance Report (Runs on the 1st of the month)
+    # --------------------------------------------------------------------------
+    reports_generated = 0
+    if as_of_date.day == 1:
+        try:
+            if as_of_date.month == 1:
+                rep_year = as_of_date.year - 1
+                rep_month = 12
+            else:
+                rep_year = as_of_date.year
+                rep_month = as_of_date.month - 1
+
+            with transaction.atomic():
+                report, created = generate_monthly_report(
+                    year=rep_year,
+                    month=rep_month,
+                    as_of_date=as_of_date,
+                    generated_by=user,
+                )
+                if created:
+                    reports_generated += 1
+        except Exception as e:
+            errors.append(f"Step (e) Month-end finance report error: {str(e)}")
+
+    # --------------------------------------------------------------------------
     # Finalize Run Record
     # --------------------------------------------------------------------------
     duration = Decimal(str(round(time.time() - start_time, 3)))
@@ -259,6 +285,7 @@ def execute_daily_jobs(
     run_record.renewals_made = renewals_made
     run_record.subscriptions_closed = subscriptions_closed
     run_record.reminders_sent = reminders_sent
+    run_record.reports_generated = reports_generated
     run_record.duration_seconds = duration
 
     if errors:

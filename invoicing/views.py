@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -18,13 +19,14 @@ from automation.clock import get_today
 
 from .dashboard import get_finance_dashboard_context
 from .forms import PaymentForm
-from .models import BankStatement, BankStatementRow, Invoice, Payment
+from .models import BankStatement, BankStatementRow, Invoice, MonthlyReport, Payment
 from .reconciliation import (
     approve_reconciliation_row,
     manually_reconcile_row,
     parse_statement_csv,
     process_bank_statement,
 )
+from .reports import generate_monthly_report, generate_report_csv
 from .services import generate_invoices
 
 
@@ -571,4 +573,111 @@ def reconciliation_row_manual(request, row_pk):
         messages.error(request, str(e.message if hasattr(e, 'message') else e))
 
     return redirect('invoicing:reconciliation_detail', pk=row.statement_id)
+
+
+@staff_or_admin_required
+def monthly_report_list(request):
+    """
+    Lists generated monthly finance reports, sorted chronologically descending.
+    Allows staff and admins to view past executive summaries or trigger manual generation.
+    """
+    reports = MonthlyReport.objects.select_related('generated_by').all().order_by('-year', '-month')
+    paginator = Paginator(reports, 12)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # Calculate default previous month for the Generate button
+    today = get_today()
+    if today.month == 1:
+        prev_year = today.year - 1
+        prev_month = 12
+    else:
+        prev_year = today.year
+        prev_month = today.month - 1
+
+    latest_report = reports.first()
+
+    return render(request, 'invoicing/monthly_report_list.html', {
+        'page_obj': page_obj,
+        'total_reports': reports.count(),
+        'latest_report': latest_report,
+        'default_year': prev_year,
+        'default_month': prev_month,
+        'today': today,
+    })
+
+
+@staff_or_admin_required
+def monthly_report_detail(request, pk):
+    """
+    Detailed executive view of a specific month-end finance report.
+    Displays subscription stats, MRR, revenue received, amount owed,
+    overdue aging buckets (1-30, 31-60, 60+ days), and top 10 customers.
+    """
+    report = get_object_or_404(MonthlyReport.objects.select_related('generated_by'), pk=pk)
+
+    return render(request, 'invoicing/monthly_report_detail.html', {
+        'report': report,
+    })
+
+
+@staff_or_admin_required
+@require_POST
+def monthly_report_generate(request):
+    """
+    Triggers month-end finance report generation.
+    Enforces the single-generation constraint: will not regenerate twice unless force=1 is passed.
+    Emails executive summary to admins via the console backend.
+    """
+    today = get_today()
+    if today.month == 1:
+        default_year = today.year - 1
+        default_month = 12
+    else:
+        default_year = today.year
+        default_month = today.month - 1
+
+    try:
+        year = int(request.POST.get('year', default_year))
+        month = int(request.POST.get('month', default_month))
+        if not (1 <= month <= 12) or year < 2000 or year > 2100:
+            raise ValueError
+    except (ValueError, TypeError):
+        messages.error(request, "Invalid year or month specified for report generation.")
+        return redirect('invoicing:report_list')
+
+    force = request.POST.get('force') == '1'
+
+    report, created = generate_monthly_report(
+        year=year,
+        month=month,
+        as_of_date=today,
+        generated_by=request.user,
+        force=force,
+    )
+
+    if created:
+        messages.success(
+            request,
+            f"Month-end report for {report.month_name} {report.year} generated successfully and emailed to admins."
+        )
+    else:
+        messages.info(
+            request,
+            f"Report for {report.month_name} {report.year} already exists (generated on {report.generated_at.strftime('%Y-%m-%d')}). Displaying existing record."
+        )
+
+    return redirect('invoicing:report_detail', pk=report.pk)
+
+
+@staff_or_admin_required
+def monthly_report_download_csv(request, pk):
+    """
+    Exports the selected month-end finance report, aging buckets, and top 10 customers as a downloadable CSV.
+    """
+    report = get_object_or_404(MonthlyReport, pk=pk)
+    csv_data = generate_report_csv(report)
+
+    response = HttpResponse(csv_data, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="Brightloop_Monthly_Report_{report.year}_{report.month:02d}.csv"'
+    return response
 

@@ -36,6 +36,7 @@
             <li><a href="{% url 'invoicing:invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name %}active{% endif %}">Invoices</a></li>
             <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">Payments</a></li>
             <li><a href="{% url 'invoicing:reconciliation_dashboard' %}" class="nav-link {% if 'reconciliation' in request.resolver_match.url_name %}active{% endif %}">Reconciliation</a></li>
+            <li><a href="{% url 'invoicing:report_list' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}">Reports</a></li>
             <li><a href="{% url 'subscriptions:template_list' %}" class="nav-link {% if 'template' in request.resolver_match.url_name %}active{% endif %}">Quotes & Templates</a></li>
             <li><a href="{% url 'catalog:product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">Products</a></li>
             <li><a href="{% url 'catalog:plan_list' %}" class="nav-link {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">Plans</a></li>

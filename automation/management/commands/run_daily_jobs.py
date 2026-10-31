@@ -13,7 +13,8 @@ class Command(BaseCommand):
         "(a) Catch-up recurring billing (generate_invoices)\n"
         "(b) Auto-renew subscriptions expiring within 3 days\n"
         "(c) Auto-close expired subscriptions with auto_close_on_end=True\n"
-        "(d) Dispatch non-renewable and overdue invoice reminders"
+        "(d) Dispatch non-renewable and overdue invoice reminders\n"
+        "(e) Generate month-end finance report (on the 1st of the month)"
     )
 
     def add_arguments(self, parser):
@@ -55,6 +56,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"(b) Subscriptions auto-renewed: {run_record.renewals_made}"))
         self.stdout.write(self.style.SUCCESS(f"(c) Expired subscriptions closed: {run_record.subscriptions_closed}"))
         self.stdout.write(self.style.SUCCESS(f"(d) Automated reminders dispatched: {run_record.reminders_sent}"))
+        self.stdout.write(self.style.SUCCESS(f"(e) Month-end reports generated: {run_record.reports_generated}"))
         self.stdout.write(self.style.SUCCESS(f"Duration: {run_record.duration_seconds}s | Status: {run_record.get_status_display()}"))
 
         if run_record.errors:

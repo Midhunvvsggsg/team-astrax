@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.core import mail
@@ -7,15 +7,21 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
+from automation.services import execute_daily_jobs
 from catalog.models import Plan, Product, Tax
-from invoicing.models import BankStatement, BankStatementRow, Invoice, Payment
+from invoicing.models import BankStatement, BankStatementRow, Invoice, MonthlyReport, Payment
 from invoicing.reconciliation import (
     parse_statement_csv,
 )
+from invoicing.reports import (
+    calculate_monthly_metrics,
+    generate_monthly_report,
+)
 from invoicing.services import advance_period_date, generate_invoices
-from subscriptions.models import DiscountRule, Subscription, SubscriptionLine
+from subscriptions.models import DiscountRule, Subscription, SubscriptionLine, SubscriptionStatusHistory
 
 
 class InvoiceGenerationServiceTests(TestCase):
@@ -1490,6 +1496,323 @@ class BankStatementReconciliationTests(TestCase):
         dummy_csv = SimpleUploadedFile("statement.csv", b"date,description,amount,reference\n", content_type="text/csv")
         resp_post = self.client.post(reverse('invoicing:reconciliation_dashboard'), {'statement_file': dummy_csv})
         self.assertEqual(resp_post.status_code, 403)
+
+
+class MonthlyFinanceReportTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user(
+            email='admin_fin_test@brightloop.local',
+            password='AdminPassword@1',
+            role=User.Role.ADMIN
+        )
+        self.staff = User.objects.create_user(
+            email='staff_fin_test@brightloop.local',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.customer1 = User.objects.create_user(
+            email='acme_corp@client.com',
+            first_name='Acme',
+            last_name='Corp',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.customer2 = User.objects.create_user(
+            email='beta_inc@client.com',
+            first_name='Beta',
+            last_name='Inc',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.customer3 = User.objects.create_user(
+            email='gamma_llc@client.com',
+            first_name='Gamma',
+            last_name='LLC',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+
+        self.plan_monthly = Plan.objects.create(
+            name="Cloud Monthly Plan",
+            price=Decimal('100.00'),
+            billing_period=Plan.BillingPeriod.MONTHLY
+        )
+        self.plan_yearly = Plan.objects.create(
+            name="Cloud Yearly Plan",
+            price=Decimal('1200.00'),
+            billing_period=Plan.BillingPeriod.YEARLY
+        )
+        self.product = Product.objects.create(
+            name="Platform Seat",
+            sales_price=Decimal('50.00')
+        )
+
+    def test_monthly_metrics_calculation_with_known_seeded_data(self):
+        """
+        Validates calculation accuracy of active/new/closed subscriptions, MRR,
+        revenue collected, amount owed, overdue aging buckets (1-30, 31-60, 60+),
+        and top customers against deterministic test data.
+        """
+        # Active subscription 1: started in Jan 2026 ($100/mo)
+        sub1 = Subscription.objects.create(
+            customer=self.customer1,
+            plan=self.plan_monthly,
+            start_date=date(2026, 1, 10),
+            status=Subscription.Status.ACTIVE,
+        )
+        SubscriptionLine.objects.create(
+            subscription=sub1,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal('50.00')
+        )
+
+        # Active subscription 2: started in 2025 ($1200/yr -> $100 MRR)
+        sub2 = Subscription.objects.create(
+            customer=self.customer2,
+            plan=self.plan_yearly,
+            start_date=date(2025, 6, 1),
+            status=Subscription.Status.ACTIVE,
+        )
+        SubscriptionLine.objects.create(
+            subscription=sub2,
+            product=self.product,
+            quantity=1,
+            unit_price=Decimal('1200.00')
+        )
+
+        # Closed subscription 3: expired and closed in Jan 2026
+        sub3 = Subscription.objects.create(
+            customer=self.customer3,
+            plan=self.plan_monthly,
+            start_date=date(2025, 1, 1),
+            expiry_date=date(2026, 1, 15),
+            status=Subscription.Status.CLOSED,
+        )
+        history = SubscriptionStatusHistory.objects.create(
+            subscription=sub3,
+            from_status=Subscription.Status.ACTIVE,
+            to_status=Subscription.Status.CLOSED,
+            changed_by=self.admin,
+            notes="Expired end of period"
+        )
+        SubscriptionStatusHistory.objects.filter(pk=history.pk).update(
+            changed_at=timezone.make_aware(datetime(2026, 1, 15, 12, 0, 0))
+        )
+
+        # Invoices:
+        # 1. Fully paid invoice for customer 1 ($100 paid in Jan 2026)
+        inv_paid = Invoice.objects.create(
+            subscription=sub1,
+            customer=self.customer1,
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            issue_date=date(2026, 1, 10),
+            due_date=date(2026, 1, 25),
+            status=Invoice.Status.CONFIRMED,
+            subtotal=Decimal('100.00'),
+            grand_total=Decimal('100.00'),
+        )
+        Payment.objects.create(
+            invoice=inv_paid,
+            amount=Decimal('100.00'),
+            date=date(2026, 1, 12),
+            note='PAY-PAID-001'
+        )
+
+        # 2. Partially paid invoice for customer 2 ($300 total, $200 paid, $100 due).
+        # Due 2026-01-20 -> As of 2026-02-01, 12 days past due (1-30 days bucket).
+        inv_part = Invoice.objects.create(
+            subscription=sub2,
+            customer=self.customer2,
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            issue_date=date(2026, 1, 15),
+            due_date=date(2026, 1, 20),
+            status=Invoice.Status.CONFIRMED,
+            subtotal=Decimal('300.00'),
+            grand_total=Decimal('300.00'),
+        )
+        Payment.objects.create(
+            invoice=inv_part,
+            amount=Decimal('200.00'),
+            date=date(2026, 1, 18),
+            note='PAY-PART-002'
+        )
+
+        # 3. 31-60 days overdue invoice for customer 3 ($250 due).
+        # Due 2025-12-15 -> As of 2026-02-01, 48 days past due.
+        Invoice.objects.create(
+            subscription=sub3,
+            customer=self.customer3,
+            period_start=date(2025, 12, 1),
+            period_end=date(2025, 12, 31),
+            issue_date=date(2025, 12, 1),
+            due_date=date(2025, 12, 15),
+            status=Invoice.Status.CONFIRMED,
+            subtotal=Decimal('250.00'),
+            grand_total=Decimal('250.00'),
+        )
+
+        # 4. 60+ days overdue invoice for customer 1 ($500 due).
+        # Due 2025-10-20 -> As of 2026-02-01, 104 days past due.
+        Invoice.objects.create(
+            subscription=sub1,
+            customer=self.customer1,
+            period_start=date(2025, 10, 1),
+            period_end=date(2025, 10, 31),
+            issue_date=date(2025, 10, 1),
+            due_date=date(2025, 10, 20),
+            status=Invoice.Status.CONFIRMED,
+            subtotal=Decimal('500.00'),
+            grand_total=Decimal('500.00'),
+        )
+
+        as_of = date(2026, 2, 1)
+        metrics = calculate_monthly_metrics(year=2026, month=1, as_of_date=as_of)
+
+        self.assertEqual(metrics['active_subscriptions'], 2)
+        self.assertEqual(metrics['new_subscriptions'], 1)
+        self.assertEqual(metrics['closed_subscriptions'], 1)
+        self.assertEqual(metrics['mrr'], Decimal('200.00'))
+        self.assertEqual(metrics['revenue_received'], Decimal('300.00'))  # $100 + $200
+        self.assertEqual(metrics['amount_still_owed'], Decimal('850.00'))  # $100 + $250 + $500
+
+        # Aging buckets validation
+        self.assertEqual(metrics['overdue_1_30_count'], 1)
+        self.assertEqual(metrics['overdue_1_30_amount'], Decimal('100.00'))
+
+        self.assertEqual(metrics['overdue_31_60_count'], 1)
+        self.assertEqual(metrics['overdue_31_60_amount'], Decimal('250.00'))
+
+        self.assertEqual(metrics['overdue_60_plus_count'], 1)
+        self.assertEqual(metrics['overdue_60_plus_amount'], Decimal('500.00'))
+
+        self.assertEqual(metrics['total_overdue_count'], 3)
+        self.assertEqual(metrics['total_overdue_amount'], Decimal('850.00'))
+
+        # Top customers validation
+        self.assertEqual(len(metrics['top_customers']), 2)
+        self.assertEqual(metrics['top_customers'][0]['email'], 'beta_inc@client.com')
+        self.assertEqual(metrics['top_customers'][0]['total_paid'], '200.00')
+        self.assertEqual(metrics['top_customers'][1]['email'], 'acme_corp@client.com')
+        self.assertEqual(metrics['top_customers'][1]['total_paid'], '100.00')
+
+    def test_single_generation_constraint_and_idempotency(self):
+        """Calling generate_monthly_report twice returns existing record without creating duplicates."""
+        report1, created1 = generate_monthly_report(2026, 3, as_of_date=date(2026, 4, 1), generated_by=self.admin)
+        self.assertTrue(created1)
+        self.assertEqual(MonthlyReport.objects.filter(year=2026, month=3).count(), 1)
+
+        # Second call with force=False returns existing report
+        report2, created2 = generate_monthly_report(2026, 3, as_of_date=date(2026, 4, 1), generated_by=self.admin)
+        self.assertFalse(created2)
+        self.assertEqual(report1.pk, report2.pk)
+        self.assertEqual(MonthlyReport.objects.filter(year=2026, month=3).count(), 1)
+
+        # Database unique constraint also prevents duplicate insertion
+        with self.assertRaises(IntegrityError):
+            MonthlyReport.objects.create(
+                year=2026,
+                month=3,
+                period_start=date(2026, 3, 1),
+                period_end=date(2026, 3, 31)
+            )
+
+    def test_admin_console_email_dispatch(self):
+        """Report generation emails executive summary to all active admins."""
+        mail.outbox = []
+        report, created = generate_monthly_report(2026, 4, as_of_date=date(2026, 5, 1), generated_by=self.admin)
+        self.assertTrue(created)
+
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertIn("Brightloop Month-End Finance Report: April 2026", msg.subject)
+        self.assertIn("Active Subscriptions:", msg.body)
+        self.assertIn("MRR:", msg.body)
+        self.assertIn("Revenue Received:", msg.body)
+        self.assertIn("OVERDUE INVOICES & AGING BUCKETS", msg.body)
+
+    def test_csv_download_endpoint(self):
+        """CSV download returns attachment with correct MIME type and formatted content."""
+        report, _ = generate_monthly_report(2026, 5, as_of_date=date(2026, 6, 1), generated_by=self.admin)
+        self.client.force_login(self.staff)
+
+        resp = self.client.get(reverse('invoicing:report_csv', kwargs={'pk': report.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('text/csv', resp['Content-Type'])
+        self.assertIn('attachment; filename="Brightloop_Monthly_Report_2026_05.csv"', resp['Content-Disposition'])
+
+        csv_text = resp.content.decode('utf-8')
+        self.assertIn("BRIGHTLOOP MONTH-END FINANCE REPORT", csv_text)
+        self.assertIn("Period,May 2026", csv_text)
+        self.assertIn("Monthly Recurring Revenue (MRR)", csv_text)
+        self.assertIn("OVERDUE AGING BUCKET", csv_text)
+
+    def test_daily_jobs_integration_on_first_of_month(self):
+        """Daily automation generates previous month report on the 1st, and never twice."""
+        # Run on 2026-07-01: should trigger report for June 2026 (2026, 6)
+        run_record = execute_daily_jobs(
+            trigger='scheduled',
+            user=None,
+            as_of_date=date(2026, 7, 1)
+        )
+        self.assertEqual(run_record.reports_generated, 1)
+        self.assertTrue(MonthlyReport.objects.filter(year=2026, month=6).exists())
+
+        # Running again on same day creates 0 duplicate reports
+        run_record2 = execute_daily_jobs(
+            trigger='scheduled',
+            user=None,
+            as_of_date=date(2026, 7, 1)
+        )
+        self.assertEqual(run_record2.reports_generated, 0)
+        self.assertEqual(MonthlyReport.objects.filter(year=2026, month=6).count(), 1)
+
+        # Running on the 2nd does not trigger report generation
+        run_record3 = execute_daily_jobs(
+            trigger='scheduled',
+            user=None,
+            as_of_date=date(2026, 7, 2)
+        )
+        self.assertEqual(run_record3.reports_generated, 0)
+
+    def test_permissions_role_enforcement(self):
+        """Staff/Admin have full access; Customers are blocked with 403 Forbidden."""
+        report, _ = generate_monthly_report(2026, 8, as_of_date=date(2026, 9, 1), generated_by=self.admin)
+
+        # Customer is forbidden
+        self.client.force_login(self.customer1)
+        resp_list = self.client.get(reverse('invoicing:report_list'))
+        self.assertEqual(resp_list.status_code, 403)
+
+        resp_detail = self.client.get(reverse('invoicing:report_detail', kwargs={'pk': report.pk}))
+        self.assertEqual(resp_detail.status_code, 403)
+
+        resp_gen = self.client.post(reverse('invoicing:report_generate'), {'year': 2026, 'month': 8})
+        self.assertEqual(resp_gen.status_code, 403)
+
+        resp_csv = self.client.get(reverse('invoicing:report_csv', kwargs={'pk': report.pk}))
+        self.assertEqual(resp_csv.status_code, 403)
+
+        # Staff can view reports and download CSV
+        self.client.force_login(self.staff)
+        resp_staff_list = self.client.get(reverse('invoicing:report_list'))
+        self.assertEqual(resp_staff_list.status_code, 200)
+
+        resp_staff_detail = self.client.get(reverse('invoicing:report_detail', kwargs={'pk': report.pk}))
+        self.assertEqual(resp_staff_detail.status_code, 200)
+
+        # Admin can generate
+        self.client.force_login(self.admin)
+        resp_admin_gen = self.client.post(
+            reverse('invoicing:report_generate'),
+            {'year': 2026, 'month': 8, 'force': '1'},
+            follow=True
+        )
+        self.assertEqual(resp_admin_gen.status_code, 200)
+        self.assertContains(resp_admin_gen, "Month-end report for August 2026 generated successfully")
 
 
 

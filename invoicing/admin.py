@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BankStatement, BankStatementRow, Invoice, InvoiceLine
+from .models import BankStatement, BankStatementRow, Invoice, InvoiceLine, MonthlyReport
 
 
 class InvoiceLineInline(admin.TabularInline):
@@ -35,4 +35,24 @@ class BankStatementAdmin(admin.ModelAdmin):
     list_display = ('filename', 'uploaded_at', 'uploaded_by', 'total_rows', 'auto_reconciled_count', 'needs_review_count', 'unmatched_count', 'duplicate_count')
     readonly_fields = ('uploaded_at', 'total_rows', 'auto_reconciled_count', 'needs_review_count', 'unmatched_count', 'duplicate_count')
     inlines = [BankStatementRowInline]
+
+
+@admin.register(MonthlyReport)
+class MonthlyReportAdmin(admin.ModelAdmin):
+    list_display = (
+        '__str__', 'year', 'month', 'period_start', 'period_end',
+        'active_subscriptions', 'mrr', 'revenue_received', 'amount_still_owed',
+        'total_overdue_count', 'total_overdue_amount', 'generated_at', 'generated_by'
+    )
+    list_filter = ('year', 'month')
+    readonly_fields = (
+        'year', 'month', 'period_start', 'period_end', 'generated_at', 'generated_by',
+        'active_subscriptions', 'new_subscriptions', 'closed_subscriptions',
+        'mrr', 'revenue_received', 'amount_still_owed',
+        'overdue_1_30_count', 'overdue_1_30_amount',
+        'overdue_31_60_count', 'overdue_31_60_amount',
+        'overdue_60_plus_count', 'overdue_60_plus_amount',
+        'total_overdue_count', 'total_overdue_amount',
+        'top_customers_json'
+    )
 
