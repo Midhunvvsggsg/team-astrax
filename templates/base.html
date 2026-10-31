@@ -27,7 +27,10 @@
           {% if user.is_customer %}
             <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions & Invoices</a></li>
           {% elif user.is_staff_member or user.is_admin %}
-            <li><a href="{% url 'home' %}" class="nav-link">Dashboard</a></li>
+            <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="{% url 'catalog:product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">Products</a></li>
+            <li><a href="{% url 'catalog:plan_list' %}" class="nav-link {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">Plans</a></li>
+            <li><a href="{% url 'catalog:tax_list' %}" class="nav-link {% if 'tax' in request.resolver_match.url_name %}active{% endif %}">Taxes</a></li>
             {% if user.is_admin %}
               <li><a href="{% url 'staff_management' %}" class="nav-link {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">Staff Management</a></li>
             {% endif %}

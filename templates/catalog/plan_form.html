@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Brightloop Catalog{% endblock %}
+
+{% block content %}
+<div style="max-width: 620px; margin: 0 auto;">
+  <div style="margin-bottom: var(--space-16);">
+    <a href="{% url 'catalog:plan_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+      ← Cancel
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h1 class="card-title">{{ title }}</h1>
+      <p class="card-subtitle">Set recurring billing parameters, limits, and subscription behaviors</p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.name.id_for_label }}">Plan Name *</label>
+        {{ form.name }}
+        {% if form.name.errors %}
+          <div class="form-error">{{ form.name.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="{{ form.price.id_for_label }}">Plan Price ($) *</label>
+          {{ form.price }}
+          <p class="form-help">Base recurring fee (must be non-negative).</p>
+          {% if form.price.errors %}
+            <div class="form-error">{{ form.price.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="{{ form.billing_period.id_for_label }}">Billing Frequency *</label>
+          {{ form.billing_period }}
+          {% if form.billing_period.errors %}
+            <div class="form-error">{{ form.billing_period.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.minimum_quantity.id_for_label }}">Minimum Seats / Quantity *</label>
+        {{ form.minimum_quantity }}
+        <p class="form-help">Minimum quantity required to subscribe (at least 1).</p>
+        {% if form.minimum_quantity.errors %}
+          <div class="form-error">{{ form.minimum_quantity.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="{{ form.available_from.id_for_label }}">Available From</label>
+          {{ form.available_from }}
+          {% if form.available_from.errors %}
+            <div class="form-error">{{ form.available_from.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="{{ form.available_to.id_for_label }}">Available To</label>
+          {{ form.available_to }}
+          {% if form.available_to.errors %}
+            <div class="form-error">{{ form.available_to.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Lifecycle Flags Section -->
+      <div style="background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md); margin-bottom: var(--space-16);">
+        <h3 style="font-size: var(--font-size-sm); font-weight: 700; margin-bottom: var(--space-8);">Subscription Lifecycle Behaviors</h3>
+        
+        <div style="display: flex; flex-direction: column; gap: var(--space-8);">
+          <label style="display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm);">
+            {{ form.auto_close_on_end }}
+            <span><strong>Auto Close on End:</strong> Automatically mark closed when end date arrives</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm);">
+            {{ form.closable_early }}
+            <span><strong>Closable Early:</strong> Can be terminated early by customer or staff</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm);">
+            {{ form.pausable }}
+            <span><strong>Pausable:</strong> Can be temporarily paused and resumed</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm);">
+            {{ form.renewable }}
+            <span><strong>Renewable:</strong> Can be renewed upon period completion</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="display: flex; align-items: center; gap: var(--space-8);">
+        {{ form.is_active }}
+        <label class="form-label" for="{{ form.is_active.id_for_label }}" style="margin-bottom: 0;">Active Plan</label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: var(--space-16); margin-top: var(--space-24);">
+        <a href="{% url 'catalog:plan_list' %}" class="btn btn-secondary">
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Save Plan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

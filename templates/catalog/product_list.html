@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Products - Brightloop Catalog{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Catalog</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Products & Services</h1>
+      <p class="card-subtitle">Manage subscription catalog, products, and pricing variants.</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:product_create' %}" class="btn btn-primary">+ Add Product</a>
+    {% endif %}
+  </div>
+
+  <!-- Search & Filters -->
+  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by name or notes...">
+    </div>
+    <div style="min-width: 150px;">
+      <select name="type" class="form-select">
+        <option value="">All Types</option>
+        {% for code, label in product_types %}
+          <option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 130px;">
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or type_filter or status_filter %}
+      <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Product Table -->
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Type</th>
+            <th>Base Sales Price</th>
+            <th>Cost Price</th>
+            <th>Variants</th>
+            <th>Status</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'catalog:product_detail' pk=product.pk %}" style="font-weight: 600;">
+                  {{ product.name }}
+                </a>
+                {% if product.notes %}
+                  <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    {{ product.notes }}
+                  </div>
+                {% endif %}
+              </td>
+              <td><span class="badge" style="background: var(--color-surface-muted);">{{ product.get_product_type_display }}</span></td>
+              <td><strong>${{ product.sales_price }}</strong></td>
+              <td style="color: var(--color-text-muted);">${{ product.cost_price }}</td>
+              <td>
+                <span class="badge" style="background: #e0f2fe; color: #0369a1;">
+                  {{ product.variants.count }} variant{{ product.variants.count|pluralize }}
+                </span>
+              </td>
+              <td>
+                {% if product.is_active %}
+                  <span class="badge badge-customer">Active</span>
+                {% else %}
+                  <span class="badge badge-admin">Inactive</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <a href="{% url 'catalog:product_detail' pk=product.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">View</a>
+                {% if user.is_admin %}
+                  <a href="{% url 'catalog:product_edit' pk=product.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Edit</a>
+                  <a href="{% url 'catalog:product_delete' pk=product.pk %}" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Delete</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📦</div>
+    <h3 class="empty-state-title">No Products Found</h3>
+    <p class="empty-state-desc">
+      {% if search_query or type_filter or status_filter %}
+        No products match your search or filter criteria. Try clearing filters.
+      {% else %}
+        No products have been added to the catalog yet.
+      {% endif %}
+    </p>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:product_create' %}" class="btn btn-primary">+ Add First Product</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

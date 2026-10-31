@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Tax Rules - Brightloop Catalog{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Taxes</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Tax Configuration</h1>
+      <p class="card-subtitle">Admin-defined tax percentages and fixed fees automatically applied during invoicing.</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:tax_create' %}" class="btn btn-primary">+ Add Tax Rule</a>
+    {% endif %}
+  </div>
+
+  <!-- Search & Filters -->
+  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search tax rules by name...">
+    </div>
+    <div style="min-width: 130px;">
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or status_filter %}
+      <a href="{% url 'catalog:tax_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tax Name</th>
+            <th>Percentage Rate</th>
+            <th>Fixed Fee</th>
+            <th>Example on $100</th>
+            <th>Status</th>
+            {% if user.is_admin %}<th style="text-align: right;">Actions</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for tax in page_obj %}
+            <tr>
+              <td><strong>{{ tax.name }}</strong></td>
+              <td>{{ tax.percentage }}%</td>
+              <td>${{ tax.fixed_amount }}</td>
+              <td style="color: var(--color-primary); font-weight: 600;">
+                ${{ tax.percentage|floatformat:2 }} + ${{ tax.fixed_amount }}
+              </td>
+              <td>
+                {% if tax.is_active %}
+                  <span class="badge badge-customer">Active</span>
+                {% else %}
+                  <span class="badge badge-admin">Inactive</span>
+                {% endif %}
+              </td>
+              {% if user.is_admin %}
+                <td style="text-align: right;">
+                  <a href="{% url 'catalog:tax_edit' pk=tax.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Edit</a>
+                  <a href="{% url 'catalog:tax_delete' pk=tax.pk %}" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Delete</a>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🏛️</div>
+    <h3 class="empty-state-title">No Tax Rules Found</h3>
+    <p class="empty-state-desc">
+      {% if search_query or status_filter %}
+        No tax rules match your search.
+      {% else %}
+        No tax rules have been defined yet. Invoices will default to zero tax until rules are added.
+      {% endif %}
+    </p>
+    {% if user.is_admin %}
+      <a href="{% url 'catalog:tax_create' %}" class="btn btn-primary">+ Add First Tax Rule</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}
