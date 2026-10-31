@@ -146,3 +146,68 @@ class LoginForm(forms.Form):
 
     def get_user(self):
         return getattr(self, 'user', None)
+
+
+class CustomerProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Last Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'you@example.com'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        if not email:
+            raise ValidationError(_("Email address is required."))
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise ValidationError(_("An account with this email address already exists."))
+        return email
+
+
+class CustomerPasswordChangeForm(forms.Form):
+    current_password = forms.CharField(
+        label=_("Current Password"),
+        widget=forms.PasswordInput(attrs={'class': 'form-input', 'placeholder': 'Enter your current password'})
+    )
+    new_password = forms.CharField(
+        label=_("New Password"),
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Min 9 chars, 1 uppercase, 1 lowercase, 1 special',
+            'id': 'id_new_password'
+        }),
+        help_text=_("Must be at least 9 characters with uppercase, lowercase, and a special character.")
+    )
+    confirm_password = forms.CharField(
+        label=_("Confirm New Password"),
+        widget=forms.PasswordInput(attrs={'class': 'form-input', 'placeholder': 'Confirm your new password'})
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_current_password(self):
+        curr = self.cleaned_data.get('current_password')
+        if not self.user.check_password(curr):
+            raise ValidationError(_("Your current password was entered incorrectly. Please try again."))
+        return curr
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_pwd = cleaned_data.get('new_password')
+        conf_pwd = cleaned_data.get('confirm_password')
+
+        if new_pwd and conf_pwd:
+            if new_pwd != conf_pwd:
+                self.add_error('confirm_password', _("New passwords do not match."))
+            else:
+                validator = BrightloopPasswordValidator()
+                try:
+                    validator.validate(new_pwd, user=self.user)
+                except ValidationError as e:
+                    self.add_error('new_password', e)
+        return cleaned_data

@@ -227,23 +227,29 @@ def invoice_detail(request, pk):
     """
     Detailed view of an invoice:
     - Staff & Admin can view any invoice, transition status, send, and record payments.
-    - Customer can ONLY view their own invoice (read-only).
+    - Customer can ONLY view their own invoice (returns 404 for other customers' invoices).
     """
     if not request.user.is_authenticated:
         return redirect(f"/accounts/login/?next={request.path}")
 
-    invoice = get_object_or_404(
-        Invoice.objects.with_payment_totals()
-        .select_related('customer', 'subscription__plan')
-        .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments__recorded_by'),
-        pk=pk
-    )
+    # Enforce strict customer isolation: query strictly scoped to request.user returning 404
+    if request.user.is_customer:
+        invoice = get_object_or_404(
+            Invoice.objects.filter(customer=request.user)
+            .with_payment_totals()
+            .select_related('customer', 'subscription__plan')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments__recorded_by'),
+            pk=pk
+        )
+    else:
+        invoice = get_object_or_404(
+            Invoice.objects.with_payment_totals()
+            .select_related('customer', 'subscription__plan')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments__recorded_by'),
+            pk=pk
+        )
 
-    # Customer isolation
-    if request.user.is_customer and invoice.customer != request.user:
-        raise PermissionDenied("You can only access your own invoices.")
-
-    # Payment form only on Confirmed invoices with remaining balance
+    # Payment form only on Confirmed invoices with remaining balance for staff/admin
     payment_form = None
     if not request.user.is_customer and invoice.status == Invoice.Status.CONFIRMED and invoice.amount_due > Decimal('0.00'):
         payment_form = PaymentForm(invoice=invoice)
@@ -260,15 +266,22 @@ def invoice_print(request, pk):
     if not request.user.is_authenticated:
         return redirect(f"/accounts/login/?next={request.path}")
 
-    invoice = get_object_or_404(
-        Invoice.objects.with_payment_totals()
-        .select_related('customer', 'subscription__plan')
-        .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments'),
-        pk=pk
-    )
-
-    if request.user.is_customer and invoice.customer != request.user:
-        raise PermissionDenied("You can only access your own invoices.")
+    # Enforce strict customer isolation: query strictly scoped to request.user returning 404
+    if request.user.is_customer:
+        invoice = get_object_or_404(
+            Invoice.objects.filter(customer=request.user)
+            .with_payment_totals()
+            .select_related('customer', 'subscription__plan')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments'),
+            pk=pk
+        )
+    else:
+        invoice = get_object_or_404(
+            Invoice.objects.with_payment_totals()
+            .select_related('customer', 'subscription__plan')
+            .prefetch_related('lines__product', 'lines__variant', 'lines__tax', 'payments'),
+            pk=pk
+        )
 
     return render(request, 'invoicing/invoice_print.html', {
         'invoice': invoice,

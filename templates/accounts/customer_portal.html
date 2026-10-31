@@ -3,122 +3,313 @@
 {% block title %}Customer Portal - Brightloop{% endblock %}
 
 {% block content %}
+<!-- Welcome & Profile Quick Bar -->
 <div class="card" style="margin-bottom: var(--space-24);">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
     <div>
       <span class="badge badge-customer">Customer Portal</span>
-      <h1 class="card-title" style="margin-top: var(--space-8);">Hello, {{ customer.full_name }}</h1>
-      <p class="card-subtitle">Manage your Brightloop subscriptions, invoices, and payment history.</p>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Welcome back, {{ customer.full_name }}</h1>
+      <p class="card-subtitle">Manage your recurring subscriptions, billing invoices, receipts, and account settings.</p>
     </div>
-    <div style="text-align: right;">
+    <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
+      <a href="{% url 'customer_profile' %}" class="btn btn-secondary" style="font-size: var(--font-size-xs);">
+        👤 Edit Profile
+      </a>
+      <a href="{% url 'customer_change_password' %}" class="btn btn-secondary" style="font-size: var(--font-size-xs);">
+        🔒 Change Password
+      </a>
       <span class="user-badge">{{ customer.email }}</span>
     </div>
   </div>
 </div>
 
-<div class="grid-2">
-  <!-- My Subscriptions Section -->
-  <div class="card">
-    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <h2 class="card-title">My Subscriptions</h2>
-        <p class="card-subtitle">Active and past recurring software plans</p>
-      </div>
+<!-- My Subscriptions Section -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-8);">
+    <div>
+      <h2 class="card-title">My Recurring Subscriptions</h2>
+      <p class="card-subtitle">Active and past software plans registered to your organization</p>
     </div>
-
-    {% if subscriptions %}
-      <div class="table-container">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Number</th>
-              <th>Plan</th>
-              <th>Status</th>
-              <th>Start Date</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for sub in subscriptions %}
-              <tr>
-                <td><strong>{{ sub.subscription_number }}</strong></td>
-                <td>{{ sub.plan.name }}</td>
-                <td>
-                  <span class="badge badge-sub-{{ sub.status }}">{{ sub.get_status_display }}</span>
-                </td>
-                <td>{{ sub.start_date|date:"M d, Y" }}</td>
-                <td>
-                  <a href="{% url 'subscriptions:subscription_detail' pk=sub.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">View</a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <!-- Empty State per Hackathon UI/UX rules -->
-      <div class="empty-state">
-        <div class="empty-state-icon">📋</div>
-        <h3 class="empty-state-title">No Active Subscriptions Yet</h3>
-        <p class="empty-state-desc">
-          You do not have any active subscriptions registered. When our team assigns a subscription or quotation to your account, it will appear here.
-        </p>
-      </div>
-    {% endif %}
   </div>
 
-  <!-- My Invoices Section -->
-  <div class="card">
-    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <h2 class="card-title">My Invoices</h2>
-        <p class="card-subtitle">Billing history, tax breakdowns, and receipts</p>
-      </div>
+  {% if subscriptions %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Next Billing Date</th>
+            <th>Expiry Date</th>
+            <th style="text-align: right;">Allowed Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub in subscriptions %}
+            <tr>
+              <td>
+                <a href="{% url 'subscriptions:subscription_detail' pk=sub.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ sub.subscription_number }}
+                </a>
+              </td>
+              <td>
+                <div><strong>{{ sub.plan.name }}</strong></div>
+                <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ sub.plan.get_billing_period_display }} (${{ sub.plan.price }})</div>
+              </td>
+              <td>
+                <span class="badge badge-sub-{{ sub.status }}">{{ sub.get_status_display }}</span>
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                {% if sub.next_billing_date %}
+                  <strong>{{ sub.next_billing_date|date:"M d, Y" }}</strong>
+                {% else %}
+                  <span style="color: var(--color-text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                {% if sub.expiry_date %}
+                  <span {% if sub.is_expired and sub.status == 'active' %}style="color: var(--color-danger); font-weight: 600;"{% endif %}>
+                    {{ sub.expiry_date|date:"M d, Y" }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted);">Continuous</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: var(--space-4); align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+                  <!-- Plan-permitted lifecycle actions -->
+                  {% if sub.status == 'active' %}
+                    {% if sub.plan.pausable %}
+                      <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="pause">
+                        <button type="submit" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;" title="Pause subscription">
+                          Pause
+                        </button>
+                      </form>
+                    {% endif %}
+                    {% if not sub.expiry_date or today >= sub.expiry_date or sub.plan.closable_early %}
+                      <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="close">
+                        <button type="submit" class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="return confirm('Are you sure you want to cancel/close this subscription?');" title="Cancel/close subscription">
+                          Cancel
+                        </button>
+                      </form>
+                    {% endif %}
+                    {% if sub.plan.renewable %}
+                      <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="renew">
+                        <button type="submit" class="btn btn-primary" style="padding: 2px 8px; font-size: 0.75rem;" onclick="return confirm('Renew this subscription for another billing cycle?');" title="Renew subscription">
+                          Renew
+                        </button>
+                      </form>
+                    {% endif %}
+                  {% elif sub.status == 'paused' %}
+                    <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="resume">
+                      <button type="submit" class="btn btn-primary" style="padding: 2px 8px; font-size: 0.75rem;" title="Resume subscription">
+                        Resume
+                      </button>
+                    </form>
+                    <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="close">
+                      <button type="submit" class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="return confirm('Close this subscription?');" title="Close subscription">
+                        Close
+                      </button>
+                    </form>
+                  {% elif sub.status == 'closed' %}
+                    {% if sub.plan.renewable %}
+                      <form action="{% url 'subscriptions:customer_action' pk=sub.pk %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="renew">
+                        <button type="submit" class="btn btn-primary" style="padding: 2px 8px; font-size: 0.75rem;" onclick="return confirm('Renew this subscription?');" title="Renew closed subscription">
+                          Renew
+                        </button>
+                      </form>
+                    {% endif %}
+                  {% endif %}
+
+                  <a href="{% url 'subscriptions:subscription_detail' pk=sub.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">
+                    Details
+                  </a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3 class="empty-state-title">No Subscriptions Found</h3>
+      <p class="empty-state-desc">
+        You do not currently have any active or past subscriptions registered.
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- My Invoices Section -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
+    <div>
+      <h2 class="card-title">My Invoices & Billing History</h2>
+      <p class="card-subtitle">Itemized invoices, tax breakdowns, receipts, and payment status</p>
     </div>
 
-    {% if invoices %}
-      <div class="table-container">
-        <table class="table">
-          <thead>
+    <!-- Status Filter Pills -->
+    <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+      {% for opt_val, opt_label in status_options %}
+        <a href="?status={{ opt_val }}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem; {% if status_filter == opt_val or not status_filter and opt_val == 'all' %}background: var(--color-primary); color: #fff; border-color: var(--color-primary);{% endif %}">
+          {{ opt_label }}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if invoices %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Billing Period</th>
+            <th>Due Date</th>
+            <th>Total Amount</th>
+            <th>Balance Due</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in invoices %}
             <tr>
-              <th>Invoice #</th>
-              <th>Period</th>
-              <th>Due Date</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Action</th>
+              <td>
+                <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ inv.invoice_number }}
+                </a>
+              </td>
+              <td style="font-size: var(--font-size-xs);">{{ inv.period_start|date:"M d" }} - {{ inv.period_end|date:"M d, Y" }}</td>
+              <td style="font-size: var(--font-size-xs); {% if inv.is_overdue %}color: var(--color-danger); font-weight: 600;{% endif %}">
+                {{ inv.due_date|date:"M d, Y" }}
+                {% if inv.is_overdue %}
+                  <span class="badge badge-inv-cancelled" style="font-size: 0.6rem; padding: 1px 4px;">Overdue</span>
+                {% endif %}
+              </td>
+              <td><strong>${{ inv.grand_total }}</strong></td>
+              <td>
+                {% if inv.amount_due > 0 %}
+                  <strong style="color: var(--color-danger);">${{ inv.amount_due }}</strong>
+                {% else %}
+                  <span style="color: var(--color-success); font-weight: 600;">$0.00 (Paid)</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: var(--space-4); align-items: center; justify-content: flex-end;">
+                  <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">
+                    View
+                  </a>
+                  <a href="{% url 'invoicing:invoice_print' pk=inv.pk %}" target="_blank" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">
+                    Print
+                  </a>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {% for inv in invoices %}
-              <tr>
-                <td><strong>{{ inv.invoice_number }}</strong></td>
-                <td style="font-size: var(--font-size-xs);">{{ inv.period_start|date:"M d" }} - {{ inv.period_end|date:"M d, Y" }}</td>
-                <td style="font-size: var(--font-size-xs); {% if inv.is_overdue %}color: var(--color-danger); font-weight: 600;{% endif %}">
-                  {{ inv.due_date|date:"M d, Y" }}
-                </td>
-                <td><strong style="color: var(--color-primary);">${{ inv.grand_total }}</strong></td>
-                <td>
-                  <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
-                </td>
-                <td>
-                  <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">View</a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <!-- Empty State per Hackathon UI/UX rules -->
-      <div class="empty-state">
-        <div class="empty-state-icon">🧾</div>
-        <h3 class="empty-state-title">No Invoices Issued</h3>
-        <p class="empty-state-desc">
-          You are all caught up! Once a billing cycle runs, your generated invoices with line items and taxes will be accessible here.
-        </p>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Invoices Pagination -->
+    {% if invoices.has_other_pages %}
+      <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-16);">
+        {% if invoices.has_previous %}
+          <a href="?page={{ invoices.previous_page_number }}&status={{ status_filter }}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;">Previous</a>
+        {% endif %}
+        <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted); padding: 4px 10px; font-size: 0.75rem;">
+          Page {{ invoices.number }} of {{ invoices.paginator.num_pages }}
+        </span>
+        {% if invoices.has_next %}
+          <a href="?page={{ invoices.next_page_number }}&status={{ status_filter }}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;">Next</a>
+        {% endif %}
       </div>
     {% endif %}
+
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🧾</div>
+      <h3 class="empty-state-title">No Invoices Match Filter</h3>
+      <p class="empty-state-desc">
+        {% if status_filter and status_filter != 'all' %}
+          No invoices found with status "{{ status_filter }}". <a href="?status=all">View all invoices</a>.
+        {% else %}
+          You do not have any invoices issued yet.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Recent Payment History Section -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-8);">
+    <div>
+      <h2 class="card-title">Recent Payment Transactions</h2>
+      <p class="card-subtitle">Verified payments credited toward your account invoices</p>
+    </div>
+    <div>
+      <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;">
+        View Full Payment History →
+      </a>
+    </div>
   </div>
+
+  {% if recent_payments %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Invoice #</th>
+            <th>Method</th>
+            <th>Amount Paid</th>
+            <th>Notes / Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in recent_payments %}
+            <tr>
+              <td style="font-size: var(--font-size-xs);">{{ p.date|date:"M d, Y" }}</td>
+              <td>
+                <a href="{% url 'invoicing:invoice_detail' pk=p.invoice.pk %}" style="font-weight: 600; color: var(--color-primary);">
+                  {{ p.invoice.invoice_number }}
+                </a>
+              </td>
+              <td>
+                <span class="badge" style="background: var(--color-surface-muted);">{{ p.get_method_display }}</span>
+              </td>
+              <td><strong style="color: var(--color-success);">${{ p.amount }}</strong></td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ p.note|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state" style="padding: var(--space-24);">
+      <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin: 0;">
+        No payment transactions recorded yet. Payments recorded by billing operations will appear here.
+      </p>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

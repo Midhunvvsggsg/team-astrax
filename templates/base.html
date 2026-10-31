@@ -27,6 +27,7 @@
           {% if user.is_customer %}
             <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions & Invoices</a></li>
             <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}">My Payments</a></li>
+            <li><a href="{% url 'customer_profile' %}" class="nav-link {% if 'profile' in request.resolver_match.url_name or 'password' in request.resolver_match.url_name %}active{% endif %}">My Profile</a></li>
           {% elif user.is_staff_member or user.is_admin %}
             <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Dashboard</a></li>
             <li><a href="{% url 'subscriptions:subscription_list' %}" class="nav-link {% if 'subscription' in request.resolver_match.url_name %}active{% endif %}">Subscriptions</a></li>

@@ -183,6 +183,37 @@ class Subscription(models.Model):
             return date.today() > self.expiry_date
         return False
 
+    @property
+    def next_billing_date(self):
+        """
+        Computes the upcoming billing date for active subscriptions.
+        If subscription is closed, draft, quotation, or expired, returns None.
+        Uses prefetched invoices cache if available to prevent N+1 queries.
+        """
+        if self.status in [self.Status.CLOSED, self.Status.DRAFT, self.Status.QUOTATION]:
+            return None
+        if self.is_expired:
+            return None
+
+        # Utilize prefetched objects cache if already loaded
+        if hasattr(self, '_prefetched_objects_cache') and 'invoices' in self._prefetched_objects_cache:
+            invs = [inv for inv in self.invoices.all() if inv.period_end]
+            if invs:
+                latest_inv = max(invs, key=lambda i: i.period_end)
+                nxt = latest_inv.period_end + timedelta(days=1)
+            else:
+                nxt = self.start_date
+        else:
+            latest_inv = self.invoices.order_by('-period_end').first()
+            if latest_inv:
+                nxt = latest_inv.period_end + timedelta(days=1)
+            else:
+                nxt = self.start_date
+
+        if self.expiry_date and nxt > self.expiry_date:
+            return None
+        return nxt
+
     def validate_minimum_quantity(self):
         """Enforces plan's minimum quantity across lines."""
         if self.pk:

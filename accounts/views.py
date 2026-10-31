@@ -1,6 +1,10 @@
+from datetime import date
+from decimal import Decimal
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.contrib.auth.views import (
     PasswordResetView,
     PasswordResetDoneView,
@@ -9,8 +13,15 @@ from django.contrib.auth.views import (
 )
 from django.urls import reverse_lazy
 from .models import User
-from .forms import CustomerSignupForm, StaffCreationForm, LoginForm
+from .forms import (
+    CustomerSignupForm,
+    StaffCreationForm,
+    LoginForm,
+    CustomerProfileForm,
+    CustomerPasswordChangeForm,
+)
 from .decorators import admin_required, customer_required, staff_or_admin_required
+from invoicing.models import Invoice, Payment
 from invoicing.dashboard import get_finance_dashboard_context
 
 def home_view(request):
@@ -82,13 +93,116 @@ def logout_view(request):
 
 @customer_required
 def customer_portal_view(request):
-    """Customer self-service portal (Customer role only)."""
-    subscriptions = request.user.subscriptions.select_related('plan').prefetch_related('lines__tax', 'lines__product', 'lines__variant').all()
-    invoices = request.user.invoices.select_related('subscription__plan').with_payment_totals().all()
+    """
+    Customer self-service portal (Customer role only).
+    - Subscriptions: status, plan, next billing date, expiry date, allowed actions.
+    - Invoices: filter by status, view, print, balance due.
+    - Payments: recent payment transactions.
+    """
+    subscriptions = (
+        request.user.subscriptions
+        .select_related('plan')
+        .prefetch_related('invoices', 'lines__tax', 'lines__product', 'lines__variant')
+        .all()
+    )
+
+    status_filter = request.GET.get('status', '').strip().lower()
+    invoices = (
+        request.user.invoices
+        .select_related('subscription__plan')
+        .with_payment_totals()
+        .all()
+    )
+
+    today = date.today()
+    if status_filter == 'paid':
+        invoices = invoices.filter(
+            Q(status=Invoice.Status.PAID) | Q(annotated_amount_due=Decimal('0.00'))
+        ).exclude(status=Invoice.Status.CANCELLED)
+    elif status_filter == 'overdue':
+        invoices = invoices.filter(
+            due_date__lt=today,
+            annotated_amount_due__gt=Decimal('0.00')
+        ).exclude(status__in=[Invoice.Status.PAID, Invoice.Status.CANCELLED])
+    elif status_filter == 'outstanding':
+        invoices = invoices.filter(
+            due_date__gte=today,
+            annotated_amount_due__gt=Decimal('0.00')
+        ).exclude(status__in=[Invoice.Status.PAID, Invoice.Status.CANCELLED])
+    elif status_filter in ['draft', 'confirmed', 'cancelled']:
+        invoices = invoices.filter(status=status_filter)
+
+    paginator = Paginator(invoices, 10)
+    page_number = request.GET.get('page')
+    invoices_page = paginator.get_page(page_number)
+
+    # Customer's recent payment history
+    recent_payments = (
+        Payment.objects.filter(invoice__customer=request.user)
+        .select_related('invoice')
+        .order_by('-date', '-id')[:5]
+    )
+
+    status_options = [
+        ('all', 'All Invoices'),
+        ('paid', 'Paid'),
+        ('outstanding', 'Outstanding'),
+        ('overdue', 'Overdue'),
+        ('draft', 'Draft'),
+        ('confirmed', 'Confirmed'),
+    ]
+
     return render(request, 'accounts/customer_portal.html', {
         'customer': request.user,
         'subscriptions': subscriptions,
-        'invoices': invoices,
+        'invoices': invoices_page,
+        'recent_payments': recent_payments,
+        'status_filter': status_filter,
+        'status_options': status_options,
+        'today': today,
+    })
+
+
+@customer_required
+def customer_profile_view(request):
+    """Allows logged-in customers to update their name and email."""
+    if request.method == 'POST':
+        form = CustomerProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your profile details have been updated successfully.")
+            return redirect('customer_profile')
+        else:
+            messages.error(request, "Please correct the errors in the profile form.")
+    else:
+        form = CustomerProfileForm(instance=request.user)
+
+    return render(request, 'accounts/customer_profile.html', {
+        'form': form,
+        'customer': request.user,
+    })
+
+
+@customer_required
+def customer_change_password_view(request):
+    """Allows logged-in customers to change their account password."""
+    if request.method == 'POST':
+        form = CustomerPasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            new_pwd = form.cleaned_data['new_password']
+            request.user.set_password(new_pwd)
+            request.user.save()
+            update_session_auth_hash(request, request.user)
+            messages.success(request, "Your password has been changed successfully.")
+            return redirect('customer_portal')
+        else:
+            messages.error(request, "Please correct the password errors below.")
+    else:
+        form = CustomerPasswordChangeForm(user=request.user)
+
+    return render(request, 'accounts/customer_change_password.html', {
+        'form': form,
+        'customer': request.user,
     })
 
 @admin_required
