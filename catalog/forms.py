@@ -44,9 +44,15 @@ class ProductVariantForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'style': 'margin-right: 8px;'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['extra_price'].required = False
+
     def clean_extra_price(self):
         extra = self.cleaned_data.get('extra_price')
-        if extra is not None and extra < Decimal('0.00'):
+        if extra is None:
+            return Decimal('0.00')
+        if extra < Decimal('0.00'):
             raise ValidationError(_("Extra price cannot be negative."))
         return extra
 
@@ -62,17 +68,34 @@ class TaxForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'style': 'margin-right: 8px;'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['percentage'].required = False
+        self.fields['fixed_amount'].required = False
+
     def clean_percentage(self):
         pct = self.cleaned_data.get('percentage')
-        if pct is not None and pct < Decimal('0.00'):
+        if pct is None:
+            return Decimal('0.00')
+        if pct < Decimal('0.00'):
             raise ValidationError(_("Tax percentage cannot be negative."))
         return pct
 
     def clean_fixed_amount(self):
         amt = self.cleaned_data.get('fixed_amount')
-        if amt is not None and amt < Decimal('0.00'):
+        if amt is None:
+            return Decimal('0.00')
+        if amt < Decimal('0.00'):
             raise ValidationError(_("Fixed amount cannot be negative."))
         return amt
+
+    def clean(self):
+        cleaned_data = super().clean()
+        pct = cleaned_data.get('percentage') or Decimal('0.00')
+        fixed = cleaned_data.get('fixed_amount') or Decimal('0.00')
+        if pct == Decimal('0.00') and fixed == Decimal('0.00'):
+            raise ValidationError(_("Please specify at least a tax percentage or a fixed amount."))
+        return cleaned_data
 
 
 class PlanForm(forms.ModelForm):

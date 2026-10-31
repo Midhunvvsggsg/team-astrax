@@ -264,3 +264,26 @@ class CatalogPermissionAndRoleAccessTests(TestCase):
         response = self.client.get(reverse('catalog:product_list') + '?q=NonExistent')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No Products Found")
+
+    def test_variant_form_optional_extra_price_defaults_to_zero(self):
+        """Admin can create a variant without typing extra_price; defaults to 0.00."""
+        from catalog.forms import ProductVariantForm
+        form = ProductVariantForm(data={
+            'attribute': 'Color',
+            'value': 'Silver',
+            'is_active': True,
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['extra_price'], Decimal('0.00'))
+
+    def test_tax_form_percentage_only_and_fixed_amount_only(self):
+        """TaxForm accepts percentage-only or fixed-amount-only inputs cleanly."""
+        from catalog.forms import TaxForm
+        form_pct = TaxForm(data={'name': 'Sales Tax', 'percentage': '18.00', 'is_active': True})
+        self.assertTrue(form_pct.is_valid(), form_pct.errors)
+        self.assertEqual(form_pct.cleaned_data['fixed_amount'], Decimal('0.00'))
+
+        form_fixed = TaxForm(data={'name': 'Surcharge', 'fixed_amount': '5.00', 'is_active': True})
+        self.assertTrue(form_fixed.is_valid(), form_fixed.errors)
+        self.assertEqual(form_fixed.cleaned_data['percentage'], Decimal('0.00'))
+

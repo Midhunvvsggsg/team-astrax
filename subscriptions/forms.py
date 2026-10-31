@@ -47,6 +47,10 @@ class QuotationTemplateLineForm(forms.ModelForm):
             'tax': forms.Select(attrs={'class': 'form-select'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['unit_price'].required = False
+
     def clean_quantity(self):
         qty = self.cleaned_data.get('quantity')
         if qty is not None and qty < 1:
@@ -58,6 +62,19 @@ class QuotationTemplateLineForm(forms.ModelForm):
         if price is not None and price < Decimal('0.00'):
             raise ValidationError(_("Unit price cannot be negative."))
         return price
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('unit_price'):
+            variant = cleaned_data.get('variant')
+            product = cleaned_data.get('product')
+            if variant:
+                cleaned_data['unit_price'] = variant.final_price
+            elif product:
+                cleaned_data['unit_price'] = product.sales_price
+            else:
+                cleaned_data['unit_price'] = Decimal('0.00')
+        return cleaned_data
 
 
 class SubscriptionForm(forms.ModelForm):
@@ -101,6 +118,10 @@ class SubscriptionLineForm(forms.ModelForm):
             'tax': forms.Select(attrs={'class': 'form-select'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['unit_price'].required = False
+
     def clean_quantity(self):
         qty = self.cleaned_data.get('quantity')
         if qty is not None and qty < 1:
@@ -112,6 +133,19 @@ class SubscriptionLineForm(forms.ModelForm):
         if price is not None and price < Decimal('0.00'):
             raise ValidationError(_("Unit price cannot be negative."))
         return price
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('unit_price'):
+            variant = cleaned_data.get('variant')
+            product = cleaned_data.get('product')
+            if variant:
+                cleaned_data['unit_price'] = variant.final_price
+            elif product:
+                cleaned_data['unit_price'] = product.sales_price
+            else:
+                cleaned_data['unit_price'] = Decimal('0.00')
+        return cleaned_data
 
 
 class CreateFromTemplateForm(forms.Form):
@@ -158,6 +192,28 @@ class DiscountRuleForm(forms.ModelForm):
             'products': forms.SelectMultiple(attrs={'class': 'form-select', 'style': 'min-height: 120px;'}),
             'is_active': forms.CheckboxInput(attrs={'style': 'margin-right: 8px;'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['min_purchase_amount'].required = False
+        self.fields['min_quantity'].required = False
+        self.fields['usage_limit'].required = False
+
+    def clean_min_purchase_amount(self):
+        amt = self.cleaned_data.get('min_purchase_amount')
+        if amt is None:
+            return Decimal('0.00')
+        if amt < Decimal('0.00'):
+            raise ValidationError(_("Minimum purchase amount cannot be negative."))
+        return amt
+
+    def clean_min_quantity(self):
+        qty = self.cleaned_data.get('min_quantity')
+        if qty is None:
+            return 1
+        if qty < 0:
+            raise ValidationError(_("Minimum quantity cannot be negative."))
+        return qty
 
     def clean_value(self):
         val = self.cleaned_data.get('value')

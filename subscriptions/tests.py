@@ -790,4 +790,39 @@ class SubscriptionLifecycleEdgeCasesAndRegressionTests(TestCase):
         self.assertEqual(sub_paused.status, Subscription.Status.CLOSED)
         self.assertIn("Successfully closed 2 expired subscription(s)", out.getvalue())
 
+    def test_subscription_line_form_defaults_unit_price_from_product_and_variant(self):
+        """SubscriptionLineForm defaults unit_price from catalog product/variant when left empty."""
+        from catalog.models import Product, ProductVariant
+        from subscriptions.forms import SubscriptionLineForm
+
+        product = Product.objects.create(name="Form Base Product", sales_price=Decimal('75.00'))
+        variant = ProductVariant.objects.create(product=product, attribute="Edition", value="Pro", extra_price=Decimal('25.00'))
+
+        # Product only
+        form1 = SubscriptionLineForm(data={'product': product.pk, 'quantity': 2})
+        self.assertTrue(form1.is_valid(), form1.errors)
+        self.assertEqual(form1.cleaned_data['unit_price'], Decimal('75.00'))
+
+        # Product with Variant
+        form2 = SubscriptionLineForm(data={'product': product.pk, 'variant': variant.pk, 'quantity': 1})
+        self.assertTrue(form2.is_valid(), form2.errors)
+        self.assertEqual(form2.cleaned_data['unit_price'], Decimal('100.00'))
+
+    def test_discount_rule_form_optional_min_purchase_and_quantity(self):
+        """DiscountRuleForm defaults min_purchase_amount to 0.00 and min_quantity to 1 when omitted."""
+        from subscriptions.forms import DiscountRuleForm
+        form = DiscountRuleForm(data={
+            'name': 'Easy Discount',
+            'discount_type': DiscountRule.DiscountType.PERCENTAGE,
+            'value': '15.00',
+            'scope': DiscountRule.Scope.WHOLE_SUBSCRIPTION,
+            'start_date': date.today().isoformat(),
+            'end_date': (date.today() + timedelta(days=30)).isoformat(),
+            'is_active': True,
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['min_purchase_amount'], Decimal('0.00'))
+        self.assertEqual(form.cleaned_data['min_quantity'], 1)
+
+
 
