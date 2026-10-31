@@ -868,3 +868,235 @@ class PaymentListAndPermissionTests(TestCase):
         self.assertNotContains(res_date, 'Bob Wire Transfer')
 
 
+class FinanceDashboardTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_superuser(
+            email='cfo@brightloop.com',
+            password='AdminPassword@1'
+        )
+        self.staff = User.objects.create_user(
+            email='finance_analyst@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.cust_a = User.objects.create_user(
+            email='customer_a@example.com',
+            first_name='Customer',
+            last_name='A',
+            password='Password@123',
+            role=User.Role.CUSTOMER
+        )
+        self.cust_b = User.objects.create_user(
+            email='customer_b@example.com',
+            first_name='Customer',
+            last_name='B',
+            password='Password@123',
+            role=User.Role.CUSTOMER
+        )
+
+        # Plans
+        self.plan_monthly = Plan.objects.create(
+            name="Pro Monthly",
+            price=Decimal('100.00'),
+            billing_period=Plan.BillingPeriod.MONTHLY
+        )
+        self.plan_yearly = Plan.objects.create(
+            name="Enterprise Yearly",
+            price=Decimal('2400.00'),
+            billing_period=Plan.BillingPeriod.YEARLY
+        )
+
+        today = date.today()
+
+        # Subscriptions
+        # Sub 1: Active Monthly ($100 MRR)
+        self.sub1 = Subscription.objects.create(
+            customer=self.cust_a,
+            plan=self.plan_monthly,
+            status=Subscription.Status.ACTIVE,
+            start_date=today - timedelta(days=60)
+        )
+        # Sub 2: Active Yearly ($2400 / 12 = $200 MRR)
+        self.sub2 = Subscription.objects.create(
+            customer=self.cust_b,
+            plan=self.plan_yearly,
+            status=Subscription.Status.ACTIVE,
+            start_date=today - timedelta(days=30)
+        )
+        # Sub 3: Paused Monthly (should not contribute to active count or MRR)
+        self.sub3 = Subscription.objects.create(
+            customer=self.cust_a,
+            plan=self.plan_monthly,
+            status=Subscription.Status.PAUSED,
+            start_date=today - timedelta(days=40)
+        )
+        # Sub 4: Closed Yearly (should not contribute to active count or MRR)
+        self.sub4 = Subscription.objects.create(
+            customer=self.cust_b,
+            plan=self.plan_yearly,
+            status=Subscription.Status.CLOSED,
+            start_date=today - timedelta(days=90)
+        )
+
+        # Invoices
+        # Inv 1: Cust A, due 15 days ago (Overdue), Total $100, Paid $40, Due $60
+        self.inv1 = Invoice.objects.create(
+            subscription=self.sub1,
+            customer=self.cust_a,
+            period_start=today - timedelta(days=45),
+            period_end=today - timedelta(days=15),
+            issue_date=today - timedelta(days=25),
+            due_date=today - timedelta(days=15),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('100.00')
+        )
+        self.pay1 = Payment.objects.create(
+            invoice=self.inv1,
+            amount=Decimal('40.00'),
+            date=today - timedelta(days=20),
+            method=Payment.Method.BANK_TRANSFER,
+            recorded_by=self.staff
+        )
+
+        # Inv 2: Cust B, due in 10 days (Not overdue), Total $200, Paid $50, Due $150
+        self.inv2 = Invoice.objects.create(
+            subscription=self.sub2,
+            customer=self.cust_b,
+            period_start=today,
+            period_end=today + timedelta(days=365),
+            issue_date=today,
+            due_date=today + timedelta(days=10),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('200.00')
+        )
+        self.pay2 = Payment.objects.create(
+            invoice=self.inv2,
+            amount=Decimal('50.00'),
+            date=today,
+            method=Payment.Method.CARD,
+            recorded_by=self.staff
+        )
+
+        # Inv 3: Cust A, due 5 days ago, Total $80, Paid in full ($80) -> status Paid (Not overdue)
+        self.inv3 = Invoice.objects.create(
+            subscription=self.sub1,
+            customer=self.cust_a,
+            period_start=today - timedelta(days=75),
+            period_end=today - timedelta(days=45),
+            issue_date=today - timedelta(days=55),
+            due_date=today - timedelta(days=5),
+            status=Invoice.Status.CONFIRMED,
+            grand_total=Decimal('80.00')
+        )
+        self.pay3 = Payment.objects.create(
+            invoice=self.inv3,
+            amount=Decimal('80.00'),
+            date=today - timedelta(days=10),
+            method=Payment.Method.UPI,
+            recorded_by=self.staff
+        )
+
+        # Inv 4: Cancelled, Total $50 (should not be in amount owed)
+        self.inv4 = Invoice.objects.create(
+            subscription=self.sub2,
+            customer=self.cust_b,
+            period_start=today - timedelta(days=100),
+            period_end=today - timedelta(days=70),
+            issue_date=today - timedelta(days=80),
+            due_date=today - timedelta(days=60),
+            status=Invoice.Status.CANCELLED,
+            grand_total=Decimal('50.00')
+        )
+
+    def test_dashboard_cards_match_known_seeded_data(self):
+        """Validates all 5 finance dashboard metric cards against exact seeded totals."""
+        self.client.force_login(self.staff)
+        res = self.client.get(reverse('invoicing:finance_dashboard'))
+        self.assertEqual(res.status_code, 200)
+
+        ctx = res.context
+        # 1. Active Subscriptions: sub1 + sub2 = 2
+        self.assertEqual(ctx['active_subscriptions_count'], 2)
+
+        # 2. Revenue Received: $40 + $50 + $80 = $170.00
+        self.assertEqual(ctx['revenue_received'], Decimal('170.00'))
+
+        # 3. Amount Still Owed: $60 (Inv 1) + $150 (Inv 2) = $210.00
+        self.assertEqual(ctx['amount_still_owed'], Decimal('210.00'))
+
+        # 4. Overdue Invoices Count: Only Inv 1 is past due and unpaid = 1
+        self.assertEqual(ctx['overdue_invoice_count'], 1)
+
+        # 5. Monthly Recurring Revenue (MRR): $100.00 (sub1 monthly) + $200.00 (sub2 $2400/12 yearly) = $300.00
+        self.assertEqual(ctx['monthly_recurring_revenue'], Decimal('300.00'))
+
+        # Check rendered HTML metrics
+        self.assertContains(res, "$170.00")
+        self.assertContains(res, "$210.00")
+        self.assertContains(res, "$300.00")
+
+    def test_dashboard_filter_by_customer(self):
+        """Verifies filtering by Customer A scopes all metrics appropriately."""
+        self.client.force_login(self.staff)
+        res = self.client.get(reverse('invoicing:finance_dashboard'), {'customer': self.cust_a.pk})
+        self.assertEqual(res.status_code, 200)
+
+        ctx = res.context
+        # Customer A has 1 active sub (sub1)
+        self.assertEqual(ctx['active_subscriptions_count'], 1)
+        # Customer A paid $40 + $80 = $120.00
+        self.assertEqual(ctx['revenue_received'], Decimal('120.00'))
+        # Customer A owes $60.00
+        self.assertEqual(ctx['amount_still_owed'], Decimal('60.00'))
+        # Customer A overdue count = 1
+        self.assertEqual(ctx['overdue_invoice_count'], 1)
+        # Customer A MRR = $100.00
+        self.assertEqual(ctx['monthly_recurring_revenue'], Decimal('100.00'))
+
+    def test_dashboard_filter_by_plan(self):
+        """Verifies filtering by Enterprise Yearly plan scopes all metrics."""
+        self.client.force_login(self.staff)
+        res = self.client.get(reverse('invoicing:finance_dashboard'), {'plan': self.plan_yearly.pk})
+        self.assertEqual(res.status_code, 200)
+
+        ctx = res.context
+        # Enterprise Yearly has 1 active sub (sub2)
+        self.assertEqual(ctx['active_subscriptions_count'], 1)
+        # Revenue on Enterprise Yearly = $50.00
+        self.assertEqual(ctx['revenue_received'], Decimal('50.00'))
+        # Amount owed on Enterprise Yearly = $150.00
+        self.assertEqual(ctx['amount_still_owed'], Decimal('150.00'))
+        # Overdue count on Enterprise Yearly = 0
+        self.assertEqual(ctx['overdue_invoice_count'], 0)
+        # MRR on Enterprise Yearly = $200.00
+        self.assertEqual(ctx['monthly_recurring_revenue'], Decimal('200.00'))
+
+    def test_dashboard_local_chart_js_offline_compliance(self):
+        """Verifies chart library is loaded locally from static files (no CDN)."""
+        self.client.force_login(self.staff)
+        res = self.client.get(reverse('invoicing:finance_dashboard'))
+        self.assertEqual(res.status_code, 200)
+        # Local static script
+        self.assertContains(res, 'src="/static/js/chart.umd.min.js"')
+        # Canvas elements
+        self.assertContains(res, '<canvas id="revenueChart"></canvas>')
+        self.assertContains(res, '<canvas id="planChart"></canvas>')
+        # Assert no CDN scripts exist
+        content = res.content.decode('utf-8')
+        self.assertNotIn('cdn.jsdelivr', content)
+        self.assertNotIn('cdnjs.cloudflare', content)
+        self.assertNotIn('unpkg.com', content)
+
+    def test_customer_forbidden_from_finance_dashboard(self):
+        """Customer is blocked from accessing the internal finance dashboard."""
+        self.client.force_login(self.cust_a)
+        res = self.client.get(reverse('invoicing:finance_dashboard'))
+        self.assertEqual(res.status_code, 403)
+
+        # Navigating to '/' redirects customer to their customer portal
+        res_home = self.client.get(reverse('home'))
+        self.assertRedirects(res_home, reverse('customer_portal'))
+
+
+
