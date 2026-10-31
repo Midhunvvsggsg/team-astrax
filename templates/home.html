@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Brightloop - Subscription Management System{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; padding: var(--space-32) var(--space-24); margin-bottom: var(--space-32);">
+  <span class="badge badge-staff" style="margin-bottom: var(--space-16);">Brightloop Software</span>
+  <h1 style="font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-16); color: var(--color-text);">
+    Subscription & Recurring Billing Management
+  </h1>
+  <p style="color: var(--color-text-muted); max-width: 680px; margin: 0 auto var(--space-24); font-size: var(--font-size-lg);">
+    Unified platform powering product catalogs, quotations, automated idempotent billing, discount engines, and real-time revenue intelligence.
+  </p>
+
+  {% if not user.is_authenticated %}
+    <div style="display: flex; justify-content: center; gap: var(--space-16);">
+      <a href="{% url 'signup' %}" class="btn btn-primary" style="padding: var(--space-16) var(--space-24); font-size: var(--font-size-base);">
+        Customer Sign Up
+      </a>
+      <a href="{% url 'login' %}" class="btn btn-secondary" style="padding: var(--space-16) var(--space-24); font-size: var(--font-size-base);">
+        Sign In to Portal
+      </a>
+    </div>
+  {% else %}
+    <div style="display: flex; justify-content: center; gap: var(--space-16);">
+      {% if user.is_customer %}
+        <a href="{% url 'customer_portal' %}" class="btn btn-primary">Go to My Portal</a>
+      {% else %}
+        {% if user.is_admin %}
+          <a href="{% url 'staff_management' %}" class="btn btn-primary">Manage Staff Users</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- System Role Breakdown for Hackathon Evaluation -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Role-Based Access Control</h2>
+      <p class="card-subtitle">Server-enforced boundaries across all operations</p>
+    </div>
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-16);">
+      <li style="display: flex; gap: var(--space-16); align-items: flex-start;">
+        <span class="badge badge-admin">Admin</span>
+        <div>
+          <strong>System Master:</strong> Creates staff accounts, sets discount rules, defines products, plans, and taxes. Controls finance analytics.
+        </div>
+      </li>
+      <li style="display: flex; gap: var(--space-16); align-items: flex-start;">
+        <span class="badge badge-staff">Staff</span>
+        <div>
+          <strong>Operations Team:</strong> Manages customer subscriptions, confirms invoices, records incoming payments, and tracks overdue accounts.
+        </div>
+      </li>
+      <li style="display: flex; gap: var(--space-16); align-items: flex-start;">
+        <span class="badge badge-customer">Customer</span>
+        <div>
+          <strong>Self-Service Portal:</strong> Views their own active plans, inspects invoice breakdowns, and completes payments independently.
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Core System Directives</h2>
+      <p class="card-subtitle">Built per hackathon criteria</p>
+    </div>
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-16);">
+      <li>
+        <strong>Robust Password Security:</strong> > 8 chars, uppercase, lowercase, and special character checks validated client-side and server-side.
+      </li>
+      <li>
+        <strong>Case-Insensitive Unique Emails:</strong> Consistent identity matching preventing duplicate registrations.
+      </li>
+      <li>
+        <strong>Offline Resilience:</strong> Console email backend enabled for instant local password resets without external network dependencies.
+      </li>
+      <li>
+        <strong>Single Design Tokens:</strong> Defined once via theme variables, mobile-responsive layout.
+      </li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Customer Portal - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-customer">Customer Portal</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Hello, {{ customer.full_name }}</h1>
+      <p class="card-subtitle">Manage your Brightloop subscriptions, invoices, and payment history.</p>
+    </div>
+    <div style="text-align: right;">
+      <span class="user-badge">{{ customer.email }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- My Subscriptions Section -->
+  <div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h2 class="card-title">My Subscriptions</h2>
+        <p class="card-subtitle">Active and past recurring software plans</p>
+      </div>
+    </div>
+
+    <!-- Empty State per Hackathon UI/UX rules -->
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3 class="empty-state-title">No Active Subscriptions Yet</h3>
+      <p class="empty-state-desc">
+        You do not have any active subscriptions registered. When our team assigns a subscription or quotation to your account, it will appear here.
+      </p>
+    </div>
+  </div>
+
+  <!-- My Invoices Section -->
+  <div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h2 class="card-title">My Invoices</h2>
+        <p class="card-subtitle">Billing history, tax breakdowns, and receipts</p>
+      </div>
+    </div>
+
+    <!-- Empty State per Hackathon UI/UX rules -->
+    <div class="empty-state">
+      <div class="empty-state-icon">🧾</div>
+      <h3 class="empty-state-title">No Invoices Issued</h3>
+      <p class="empty-state-desc">
+        You are all caught up! Once a billing cycle runs, your generated invoices with line items and taxes will be accessible here.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

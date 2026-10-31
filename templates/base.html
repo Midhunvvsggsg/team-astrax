@@ -1,0 +1,112 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Brightloop - Subscription Management{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <!-- Header / Navigation -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="{% url 'home' %}" class="nav-brand">
+        Brightloop <span class="badge-logo">Subscriptions</span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        ☰
+      </button>
+
+      <ul class="nav-links" id="navMenu">
+        <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
+
+        {% if user.is_authenticated %}
+          {% if user.is_customer %}
+            <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions & Invoices</a></li>
+          {% elif user.is_staff_member or user.is_admin %}
+            <li><a href="{% url 'home' %}" class="nav-link">Dashboard</a></li>
+            {% if user.is_admin %}
+              <li><a href="{% url 'staff_management' %}" class="nav-link {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">Staff Management</a></li>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+
+        {% if user.is_authenticated %}
+          <li class="nav-user">
+            <span class="user-badge">
+              {{ user.email }}
+              <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
+            </span>
+          </li>
+          <li>
+            <form action="{% url 'logout' %}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Sign Out</button>
+            </form>
+          </li>
+        {% else %}
+          <li><a href="{% url 'login' %}" class="btn btn-secondary">Sign In</a></li>
+          <li><a href="{% url 'signup' %}" class="btn btn-primary">Create Account</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </header>
+
+  <!-- Flash Messages -->
+  <main class="main-content">
+    <div class="container">
+      {% if messages %}
+        <div class="alert-container">
+          {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+              <span>{{ message }}</span>
+              <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-weight:bold;color:inherit;">✕</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 Brightloop Software &bull; Team Astrax &bull; Odoo Hackathon Demo</p>
+    </div>
+  </footer>
+
+  <script>
+    // Responsive Navbar Toggle
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('show');
+      });
+    }
+
+    // Double-submit prevention and loading feedback
+    document.querySelectorAll('form').forEach(form => {
+      form.addEventListener('submit', function() {
+        const submitBtn = this.querySelector('button[type="submit"]:not(.no-disable)');
+        if (submitBtn && !submitBtn.disabled) {
+          const originalText = submitBtn.innerHTML;
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
+          // Re-enable after 8 seconds in case validation halts submission
+          setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+          }, 8000);
+        }
+      });
+    });
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

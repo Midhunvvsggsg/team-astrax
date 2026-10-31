@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Internal Dashboard - Brightloop{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Welcome back, {{ user.full_name }}</h1>
+      <p class="card-subtitle">Brightloop Operations & Management Console</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'staff_management' %}" class="btn btn-primary">
+        + Manage Staff
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Quick Actions</h2>
+      <p class="card-subtitle">Manage Brightloop services</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--space-16);">
+      {% if user.is_admin %}
+        <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>Staff Administration</strong>
+            <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Create internal team accounts with restricted access.</p>
+          </div>
+          <a href="{% url 'staff_management' %}" class="btn btn-secondary">Open</a>
+        </div>
+      {% endif %}
+      <div style="padding: var(--space-16); background: var(--color-surface-muted); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>Subscription Catalog & Billing</strong>
+          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Products, plans, quotation templates, and recurring billing jobs.</p>
+        </div>
+        <span class="badge" style="background: #e2e8f0; color: #475569;">Ready for Phase 3</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Current System Status</h2>
+      <p class="card-subtitle">Operational parameters</p>
+    </div>
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
+        <span style="color: var(--color-text-muted);">Active Role:</span>
+        <strong>{{ user.get_role_display }}</strong>
+      </li>
+      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
+        <span style="color: var(--color-text-muted);">Authentication Type:</span>
+        <span>Case-Insensitive Email</span>
+      </li>
+      <li style="display: flex; justify-content: space-between; padding-bottom: var(--space-8); border-bottom: 1px solid var(--color-border);">
+        <span style="color: var(--color-text-muted);">Email Backend:</span>
+        <span style="color: var(--color-success); font-weight: 600;">Console (Offline Ready)</span>
+      </li>
+      <li style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Server Permission Enforcement:</span>
+        <span style="color: var(--color-success); font-weight: 600;">Active</span>
+      </li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

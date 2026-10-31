@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Staff Management - Admin Console{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-admin">Admin Only</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Staff Management</h1>
+      <p class="card-subtitle">
+        Only Administrators can create and provision internal staff accounts. Staff handle day-to-day operations with restricted access.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Create Staff Form -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Add New Staff Member</h2>
+      <p class="card-subtitle">Staff accounts are granted operational access to subscriptions and invoicing.</p>
+    </div>
+
+    <form method="post" id="staffForm" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" style="margin-bottom: var(--space-16);">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="{{ form.first_name.id_for_label }}">First Name</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <div class="form-error">{{ form.first_name.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="{{ form.last_name.id_for_label }}">Last Name</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}
+            <div class="form-error">{{ form.last_name.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.email.id_for_label }}">Staff Email *</label>
+        {{ form.email }}
+        <p class="form-help">Must be unique (case-insensitive).</p>
+        {% if form.email.errors %}
+          <div class="form-error">{{ form.email.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="{{ form.password.id_for_label }}">Temporary Password *</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="form-error">{{ form.password.errors.0 }}</div>
+        {% endif %}
+
+        <!-- Client validation indicator -->
+        <ul class="password-requirements" id="staffPasswordChecklist">
+          <li class="password-rule invalid" id="srule-length">
+            <span class="icon">○</span> More than 8 characters (at least 9)
+          </li>
+          <li class="password-rule invalid" id="srule-upper">
+            <span class="icon">○</span> At least one uppercase letter (A-Z)
+          </li>
+          <li class="password-rule invalid" id="srule-lower">
+            <span class="icon">○</span> At least one lowercase letter (a-z)
+          </li>
+          <li class="password-rule invalid" id="srule-special">
+            <span class="icon">○</span> At least one special character (!@#$%^&*)
+          </li>
+        </ul>
+      </div>
+
+      <div style="margin-top: var(--space-24);">
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Create Staff Account
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Staff Directory List -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Existing Staff ({{ staff_users.count }})</h2>
+      <p class="card-subtitle">All active internal operational members</p>
+    </div>
+
+    {% if staff_users %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for staff in staff_users %}
+              <tr>
+                <td><strong>{{ staff.full_name }}</strong></td>
+                <td>{{ staff.email }}</td>
+                <td>
+                  {% if staff.is_active %}
+                    <span class="badge badge-customer" style="font-size: 0.65rem;">Active</span>
+                  {% else %}
+                    <span class="badge badge-admin" style="font-size: 0.65rem;">Inactive</span>
+                  {% endif %}
+                </td>
+                <td style="color: var(--color-text-muted); font-size: var(--font-size-xs);">
+                  {{ staff.date_joined|date:"M d, Y" }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">👥</div>
+        <h3 class="empty-state-title">No Staff Members Added</h3>
+        <p class="empty-state-desc">
+          You haven't provisioned any staff accounts yet. Use the form on the left to add your first operational team member.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const staffPw = document.getElementById('id_staff_password');
+  const sRuleLen = document.getElementById('srule-length');
+  const sRuleUp = document.getElementById('srule-upper');
+  const sRuleLow = document.getElementById('srule-lower');
+  const sRuleSpec = document.getElementById('srule-special');
+
+  function updateRule(elem, ok) {
+    if (ok) {
+      elem.classList.remove('invalid');
+      elem.classList.add('valid');
+      elem.querySelector('.icon').textContent = '✓';
+    } else {
+      elem.classList.remove('valid');
+      elem.classList.add('invalid');
+      elem.querySelector('.icon').textContent = '○';
+    }
+  }
+
+  if (staffPw) {
+    staffPw.addEventListener('input', () => {
+      const v = staffPw.value;
+      updateRule(sRuleLen, v.length > 8);
+      updateRule(sRuleUp, /[A-Z]/.test(v));
+      updateRule(sRuleLow, /[a-z]/.test(v));
+      updateRule(sRuleSpec, /[^A-Za-z0-9]/.test(v));
+    });
+  }
+</script>
+{% endblock %}
