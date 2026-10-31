@@ -371,3 +371,107 @@ class SubscriptionStatusHistory(models.Model):
 
     def __str__(self):
         return f"{self.from_status} → {self.to_status} at {self.changed_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class DiscountRule(models.Model):
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', _('Percentage (%)')
+        FIXED = 'fixed', _('Fixed Amount ($)')
+
+    class Scope(models.TextChoices):
+        WHOLE_SUBSCRIPTION = 'whole_subscription', _('Whole Subscription')
+        SPECIFIC_PRODUCTS = 'specific_products', _('Specific Products')
+
+    name = models.CharField(_('rule name'), max_length=255, unique=True, db_index=True)
+    discount_type = models.CharField(
+        _('discount type'),
+        max_length=20,
+        choices=DiscountType.choices,
+        default=DiscountType.PERCENTAGE,
+    )
+    value = models.DecimalField(
+        _('discount value'),
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text=_("Percentage (e.g. 15.00 for 15%) or Fixed dollar amount (e.g. 50.00 for $50).")
+    )
+    min_purchase_amount = models.DecimalField(
+        _('minimum purchase amount ($)'),
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text=_("Minimum eligible subtotal required to qualify.")
+    )
+    min_quantity = models.PositiveIntegerField(
+        _('minimum quantity'),
+        default=0,
+        help_text=_("Minimum eligible seats/quantity required to qualify (0 = no minimum).")
+    )
+    start_date = models.DateField(_('start date'), null=True, blank=True)
+    end_date = models.DateField(_('end date'), null=True, blank=True)
+    usage_limit = models.PositiveIntegerField(
+        _('usage limit'),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text=_("Maximum total times this discount can be applied across all subscriptions. Leave blank for unlimited.")
+    )
+    times_used = models.PositiveIntegerField(_('times used'), default=0)
+    scope = models.CharField(
+        _('scope'),
+        max_length=30,
+        choices=Scope.choices,
+        default=Scope.WHOLE_SUBSCRIPTION,
+        help_text=_("Apply to the entire subscription or only specific eligible products.")
+    )
+    products = models.ManyToManyField(
+        'catalog.Product',
+        blank=True,
+        related_name='discount_rules',
+        help_text=_("Products eligible for this discount (required when scope is 'Specific Products').")
+    )
+    is_active = models.BooleanField(_('active'), default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _('discount rule')
+        verbose_name_plural = _('discount rules')
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['is_active', 'start_date', 'end_date']),
+        ]
+
+    def __str__(self):
+        val_str = f"{self.value}%" if self.discount_type == self.DiscountType.PERCENTAGE else f"${self.value}"
+        return f"{self.name} ({val_str} off - {self.get_scope_display()})"
+
+    @property
+    def is_expired(self):
+        if self.end_date:
+            return date.today() > self.end_date
+        return False
+
+    @property
+    def has_reached_limit(self):
+        if self.usage_limit is not None:
+            return self.times_used >= self.usage_limit
+        return False
+
+    def clean(self):
+        super().clean()
+        if self.value is not None:
+            if self.value <= Decimal('0.00'):
+                raise ValidationError({'value': _("Discount value must be greater than zero.")})
+            if self.discount_type == self.DiscountType.PERCENTAGE and self.value > Decimal('100.00'):
+                raise ValidationError({'value': _("Percentage discount cannot exceed 100%.")})
+
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                raise ValidationError({'end_date': _("End date must be on or after start date.")})
+
+        if self.usage_limit is not None and self.usage_limit < 1:
+            raise ValidationError({'usage_limit': _("Usage limit must be at least 1.")})
+

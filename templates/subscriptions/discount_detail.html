@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ discount.name }} - Discount Rule{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16);">
+  <a href="{% url 'subscriptions:discount_list' %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back to Discounts
+  </a>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+        <span class="badge" style="background: var(--color-surface-muted);">{{ discount.get_scope_display }}</span>
+        {% if not discount.is_active %}
+          <span class="badge badge-admin">Inactive</span>
+        {% elif discount.is_expired %}
+          <span class="badge badge-admin">Expired</span>
+        {% elif discount.has_reached_limit %}
+          <span class="badge" style="background: #fef3c7; color: #92400e;">Limit Reached</span>
+        {% else %}
+          <span class="badge badge-customer">Active</span>
+        {% endif %}
+      </div>
+      <h1 class="card-title">{{ discount.name }}</h1>
+      <p class="card-subtitle">
+        Discount: <strong style="color: var(--color-success); font-size: var(--font-size-lg);">
+          {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-${{ discount.value }} OFF{% endif %}
+        </strong>
+      </p>
+    </div>
+
+    {% if user.is_admin %}
+      <div style="display: flex; gap: var(--space-8);">
+        <a href="{% url 'subscriptions:discount_edit' pk=discount.pk %}" class="btn btn-primary">Edit Rule</a>
+        <a href="{% url 'subscriptions:discount_delete' pk=discount.pk %}" class="btn btn-danger">Delete</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="grid-2" style="margin-top: var(--space-24); border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Discount Type:</span>
+          <strong>{{ discount.get_discount_type_display }}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Value:</span>
+          <strong>{% if discount.discount_type == 'percentage' %}{{ discount.value }}%{% else %}${{ discount.value }}{% endif %}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Min Purchase:</span>
+          <span>${{ discount.min_purchase_amount }}</span>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Min Quantity:</span>
+          <span>{% if discount.min_quantity %}{{ discount.min_quantity }} units/seats{% else %}None{% endif %}</span>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Usage:</span>
+          <span><strong>{{ discount.times_used }}</strong> / {% if discount.usage_limit %}{{ discount.usage_limit }} limit{% else %}Unlimited{% endif %}</span>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Start Date:</span>
+          <span>{{ discount.start_date|date:"F d, Y"|default:"Immediate" }}</span>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">End Date:</span>
+          <span>{{ discount.end_date|date:"F d, Y"|default:"No Expiry" }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% if discount.scope == 'specific_products' %}
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Eligible Products ({{ eligible_products.count }})</h2>
+      <p class="card-subtitle">This discount applies only to line items matching these products</p>
+    </div>
+
+    {% if eligible_products %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Type</th>
+              <th>Sales Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for prod in eligible_products %}
+              <tr>
+                <td><strong>{{ prod.name }}</strong></td>
+                <td><span class="badge" style="background: var(--color-surface-muted);">{{ prod.get_product_type_display }}</span></td>
+                <td>${{ prod.sales_price }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <p class="empty-state-desc">No specific products selected.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

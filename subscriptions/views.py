@@ -8,13 +8,14 @@ from django.db import transaction
 from accounts.decorators import staff_or_admin_required, admin_required
 from accounts.models import User
 from catalog.models import Product, ProductVariant, Plan
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory
+from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory, DiscountRule
 from .forms import (
     QuotationTemplateForm,
     QuotationTemplateLineForm,
     SubscriptionForm,
     SubscriptionLineForm,
-    CreateFromTemplateForm
+    CreateFromTemplateForm,
+    DiscountRuleForm,
 )
 
 # ==============================================================================
@@ -452,4 +453,103 @@ def subscription_create_from_template(request):
 
     return render(request, 'subscriptions/create_from_template.html', {
         'form': form,
+    })
+
+# ==============================================================================
+# Discount Rules Views (Admin CRUD, Staff View-Only)
+# ==============================================================================
+
+@staff_or_admin_required
+def discount_list(request):
+    """View discount rules with search and pagination (Staff & Admin)."""
+    search_query = request.GET.get('q', '').strip()
+    scope_filter = request.GET.get('scope', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+
+    discounts = DiscountRule.objects.prefetch_related('products').all()
+
+    if search_query:
+        discounts = discounts.filter(name__icontains=search_query)
+    if scope_filter:
+        discounts = discounts.filter(scope=scope_filter)
+    if status_filter:
+        is_active = status_filter == 'active'
+        discounts = discounts.filter(is_active=is_active)
+
+    paginator = Paginator(discounts, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'subscriptions/discount_list.html', {
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'scope_filter': scope_filter,
+        'status_filter': status_filter,
+        'scopes': DiscountRule.Scope.choices,
+    })
+
+@staff_or_admin_required
+def discount_detail(request, pk):
+    """View discount rule details and eligible products (Staff & Admin)."""
+    discount = get_object_or_404(DiscountRule.objects.prefetch_related('products'), pk=pk)
+    return render(request, 'subscriptions/discount_detail.html', {
+        'discount': discount,
+        'eligible_products': discount.products.all(),
+    })
+
+@admin_required
+def discount_create(request):
+    """Create a new discount rule (Admin only)."""
+    if request.method == 'POST':
+        form = DiscountRuleForm(request.POST)
+        if form.is_valid():
+            rule = form.save()
+            messages.success(request, f"Discount rule '{rule.name}' created successfully.")
+            return redirect('subscriptions:discount_detail', pk=rule.pk)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = DiscountRuleForm()
+
+    return render(request, 'subscriptions/discount_form.html', {
+        'form': form,
+        'title': 'Create Discount Rule',
+    })
+
+@admin_required
+def discount_edit(request, pk):
+    """Edit existing discount rule (Admin only)."""
+    rule = get_object_or_404(DiscountRule, pk=pk)
+
+    if request.method == 'POST':
+        form = DiscountRuleForm(request.POST, instance=rule)
+        if form.is_valid():
+            rule = form.save()
+            messages.success(request, f"Discount rule '{rule.name}' updated successfully.")
+            return redirect('subscriptions:discount_detail', pk=rule.pk)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = DiscountRuleForm(instance=rule)
+
+    return render(request, 'subscriptions/discount_form.html', {
+        'form': form,
+        'discount': rule,
+        'title': f"Edit Discount: {rule.name}",
+    })
+
+@admin_required
+def discount_delete(request, pk):
+    """Delete a discount rule (Admin only)."""
+    rule = get_object_or_404(DiscountRule, pk=pk)
+    if request.method == 'POST':
+        name = rule.name
+        rule.delete()
+        messages.success(request, f"Discount rule '{name}' was deleted.")
+        return redirect('subscriptions:discount_list')
+
+    return render(request, 'subscriptions/confirm_delete.html', {
+        'object_name': f"Discount Rule {rule.name}",
+        'cancel_url': 'subscriptions:discount_detail',
+        'cancel_pk': rule.pk,
     })

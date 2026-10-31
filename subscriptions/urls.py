@@ -26,4 +26,11 @@ urlpatterns = [
     path('templates/<int:pk>/delete/', views.template_delete, name='template_delete'),
     path('templates/<int:template_pk>/lines/create/', views.template_line_create, name='template_line_create'),
     path('templates/lines/<int:pk>/delete/', views.template_line_delete, name='template_line_delete'),
+
+    # Discount Rules
+    path('discounts/', views.discount_list, name='discount_list'),
+    path('discounts/create/', views.discount_create, name='discount_create'),
+    path('discounts/<int:pk>/', views.discount_detail, name='discount_detail'),
+    path('discounts/<int:pk>/edit/', views.discount_edit, name='discount_edit'),
+    path('discounts/<int:pk>/delete/', views.discount_delete, name='discount_delete'),
 ]

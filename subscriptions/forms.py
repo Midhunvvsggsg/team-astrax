@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from accounts.models import User
 from catalog.models import Product, ProductVariant, Plan, Tax
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine
+from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, DiscountRule
 
 class QuotationTemplateForm(forms.ModelForm):
     class Meta:
@@ -126,3 +126,56 @@ class CreateFromTemplateForm(forms.Form):
         initial=Subscription.PaymentTerms.IMMEDIATE,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+
+class DiscountRuleForm(forms.ModelForm):
+    class Meta:
+        model = DiscountRule
+        fields = [
+            'name', 'discount_type', 'value', 'min_purchase_amount', 'min_quantity',
+            'start_date', 'end_date', 'usage_limit', 'scope', 'products', 'is_active'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Summer SaaS 20%'}),
+            'discount_type': forms.Select(attrs={'class': 'form-select', 'id': 'id_discount_type'}),
+            'value': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'min': '0.01'}),
+            'min_purchase_amount': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'min': '0'}),
+            'min_quantity': forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'usage_limit': forms.NumberInput(attrs={'class': 'form-input', 'min': '1'}),
+            'scope': forms.Select(attrs={'class': 'form-select', 'id': 'id_scope'}),
+            'products': forms.SelectMultiple(attrs={'class': 'form-select', 'style': 'min-height: 120px;'}),
+            'is_active': forms.CheckboxInput(attrs={'style': 'margin-right: 8px;'}),
+        }
+
+    def clean_value(self):
+        val = self.cleaned_data.get('value')
+        dtype = self.cleaned_data.get('discount_type')
+        if val is not None:
+            if val <= Decimal('0.00'):
+                raise ValidationError(_("Discount value must be greater than zero."))
+            if dtype == DiscountRule.DiscountType.PERCENTAGE and val > Decimal('100.00'):
+                raise ValidationError(_("Percentage discount cannot exceed 100%."))
+        return val
+
+    def clean_usage_limit(self):
+        limit = self.cleaned_data.get('usage_limit')
+        if limit is not None and limit < 1:
+            raise ValidationError(_("Usage limit must be at least 1."))
+        return limit
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get('start_date')
+        end = cleaned_data.get('end_date')
+        scope = cleaned_data.get('scope')
+        products = cleaned_data.get('products')
+
+        if start and end and end < start:
+            self.add_error('end_date', _("End date must be on or after start date."))
+
+        if scope == DiscountRule.Scope.SPECIFIC_PRODUCTS and not products:
+            self.add_error('products', _("Please select at least one product when scope is 'Specific Products'."))
+
+        return cleaned_data

@@ -98,3 +98,9 @@ python manage.py test
 - [x] **Minimum Quantity Check:** Total seats across subscription lines must meet the plan's minimum quantity before confirmation/activation.
 - [x] **Automated Expiry Closure Command:** `python manage.py close_expired_subscriptions` closes subscriptions past expiry date when `auto_close_on_end` is enabled.
 - [x] **Customer Portal Isolation:** Customers see only their own active and past subscriptions in read-only view.
+
+### Phase 5: Promotional Discounts Engine
+- [x] **Discount Rules Model:** Name, type (percentage or fixed amount), value, minimum purchase amount, minimum seat quantity, start/end date windows, usage limits, and times_used counters.
+- [x] **Scope Granularity:** Supports both whole-subscription discounts and specific product line discounts.
+- [x] **Reusable Evaluation Service:** `get_applicable_discounts(subscription, billing_date)` checks active status, dates, limits, minimums, and scope; guarantees percentage $\le 100\%$ and caps fixed discounts at eligible amount (never negative).
+- [x] **Admin-Only Management & Staff Read-Only:** Admin CRUD with client/server validation; Staff can inspect rules and eligibility; Customers forbidden.
