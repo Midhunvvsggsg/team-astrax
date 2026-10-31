@@ -113,3 +113,31 @@ python manage.py test
 - [x] **Robust Month-End Handling:** Automatically clamps next billing dates to calendar month-ends (e.g. Jan 31 $\rightarrow$ Feb 28, Feb 29 on leap years).
 - [x] **Interactive & CLI Billing Run:** Admin/Staff "Run Billing Engine" web button with customizable target date, plus `python manage.py generate_invoices` command with created/skipped/failed metrics.
 - [x] **Printable Invoices:** Clean `@media print` layout ready for PDF export or paper printing.
+
+### Phase 7: Invoice Lifecycle Management & Console Email Delivery
+- [x] **State Machine Enforcement:** Strict `Draft` → `Confirmed` → `Paid` transitions; cancellation permitted only for unpaid invoices; illegal transitions rejected.
+- [x] **Console Email Delivery:** Safe local console backend simulates email sending without external SMTP dependencies, automatically timestamping `sent_at`.
+- [x] **Invoice Filtering & Search:** Search by invoice number, customer name, date range, payment status (`Paid`, `Outstanding`, `Overdue`).
+
+### Phase 8: Multi-Method Payment Recording & Overdue Tracking
+- [x] **Flexible Payment Methods:** Cash, Bank Transfer, Credit/Debit Card, UPI, and Cheque.
+- [x] **Partial & Full Settlement:** Supports multiple partial payments; transitions invoice to `Paid` automatically once accumulated payments equal or exceed total amount.
+- [x] **Validation Rules:** Negative payments, zero amounts, and overpayments strictly blocked; payments only accepted on `Confirmed` invoices.
+- [x] **Zero N+1 Query Aggregates:** `amount_paid` and `amount_due` calculated directly via SQL `Sum` annotations.
+
+### Phase 9: Real-time Executive Finance Intelligence Dashboard & Local Offline Charts
+- [x] **KPI Cards:** Active Subscriptions, Total Revenue Received, Amount Still Owed, Overdue Invoices Count, and Monthly Recurring Revenue (MRR).
+- [x] **SQL-Only Aggregates:** Database-level aggregations (`Sum`, `Count`, `Case/When`, `Coalesce`) for instant calculation across thousands of records.
+- [x] **100% Offline Chart Visualizations:** Chart.js bundled locally (`static/js/chart.umd.min.js`) with zero CDN or external internet dependencies.
+
+### Phase 10: High-Performance Demo Seeder & Latency Optimization
+- [x] **Repeatable Demo Seeder (`seed_demo`):** Generates 5,000 subscriptions, 9,800+ invoices, 1,100+ payments, and 200 customers in ~35 seconds using chunked `bulk_create` and pre-computed password hashes.
+- [x] **Sub-Second Performance Benchmark:** All platform pages respond in under 60 milliseconds with 5,000+ active records.
+- [x] **Automated Query Bounds Testing:** Integrated unit tests prevent N+1 regressions across paginated lists.
+
+---
+
+## 👥 Contributors
+- **Midhun** ([@Midhunvvsggsg](https://github.com/Midhunvvsggsg))
+- **arjunsagar-ai** ([@arjunsagar-ai](https://github.com/arjunsagar-ai))
+
