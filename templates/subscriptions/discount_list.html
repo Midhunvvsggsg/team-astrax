@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}Discount Rules - Brightloop Operations{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <span class="badge badge-staff">Pricing Engine</span>
+      <h1 class="card-title" style="margin-top: var(--space-8);">Discount Rules</h1>
+      <p class="card-subtitle">Admin-defined promotional rules applied automatically by the recurring billing engine.</p>
+    </div>
+    {% if user.is_admin %}
+      <a href="{% url 'subscriptions:discount_create' %}" class="btn btn-primary">+ Add Discount Rule</a>
+    {% endif %}
+  </div>
+
+  <!-- Search & Filters -->
+  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+    <div style="flex: 1; min-width: 220px;">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search discount rules by name...">
+    </div>
+    <div style="min-width: 170px;">
+      <select name="scope" class="form-select">
+        <option value="">All Scopes</option>
+        {% for code, label in scopes %}
+          <option value="{{ code }}" {% if scope_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width: 130px;">
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or scope_filter or status_filter %}
+      <a href="{% url 'subscriptions:discount_list' %}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if page_obj %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Rule Name</th>
+            <th>Discount Value</th>
+            <th>Scope</th>
+            <th>Minimums (Amount / Qty)</th>
+            <th>Usage (Used / Limit)</th>
+            <th>Validity Window</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for discount in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'subscriptions:discount_detail' pk=discount.pk %}" style="font-weight: 700; color: var(--color-primary);">
+                  {{ discount.name }}
+                </a>
+              </td>
+              <td>
+                <strong style="color: var(--color-success);">
+                  {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-${{ discount.value }} OFF{% endif %}
+                </strong>
+              </td>
+              <td>
+                {% if discount.scope == 'whole_subscription' %}
+                  <span class="badge" style="background: var(--color-surface-muted);">Subscription</span>
+                {% else %}
+                  <span class="badge" style="background: #e0f2fe; color: #0369a1;">
+                    {{ discount.products.count }} Product{{ discount.products.count|pluralize }}
+                  </span>
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                <div>Min: ${{ discount.min_purchase_amount }}</div>
+                {% if discount.min_quantity > 0 %}
+                  <div style="color: var(--color-text-muted);">Min Qty: {{ discount.min_quantity }}</div>
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs);">
+                {% if discount.usage_limit %}
+                  <span {% if discount.has_reached_limit %}style="color: var(--color-danger); font-weight: 600;"{% endif %}>
+                    {{ discount.times_used }} / {{ discount.usage_limit }} used
+                  </span>
+                {% else %}
+                  <span>{{ discount.times_used }} used (Unlimited)</span>
+                {% endif %}
+              </td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {% if discount.start_date or discount.end_date %}
+                  {{ discount.start_date|default:"Immediate" }} → {{ discount.end_date|default:"Ongoing" }}
+                {% else %}
+                  Always Valid
+                {% endif %}
+              </td>
+              <td>
+                {% if not discount.is_active %}
+                  <span class="badge badge-admin">Inactive</span>
+                {% elif discount.is_expired %}
+                  <span class="badge badge-admin">Expired</span>
+                {% elif discount.has_reached_limit %}
+                  <span class="badge" style="background: #fef3c7; color: #92400e;">Limit Reached</span>
+                {% else %}
+                  <span class="badge badge-customer">Active</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <a href="{% url 'subscriptions:discount_detail' pk=discount.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">View</a>
+                {% if user.is_admin %}
+                  <a href="{% url 'subscriptions:discount_edit' pk=discount.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Edit</a>
+                  <a href="{% url 'subscriptions:discount_delete' pk=discount.pk %}" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Delete</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&scope={{ scope_filter }}&status={{ status_filter }}" class="btn btn-secondary">Previous</a>
+      {% endif %}
+      <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&scope={{ scope_filter }}&status={{ status_filter }}" class="btn btn-secondary">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🎟️</div>
+    <h3 class="empty-state-title">No Discount Rules Configured</h3>
+    <p class="empty-state-desc">
+      {% if search_query or scope_filter or status_filter %}
+        No discount rules matched your criteria.
+      {% else %}
+        Admin can create promotional discounts (percentage or fixed) to incentivize multi-seat subscriptions or product bundles.
+      {% endif %}
+    </p>
+    {% if user.is_admin %}
+      <a href="{% url 'subscriptions:discount_create' %}" class="btn btn-primary">+ Create First Discount Rule</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

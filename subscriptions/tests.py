@@ -7,7 +7,14 @@ from django.core.management import call_command
 from io import StringIO
 from accounts.models import User
 from catalog.models import Product, ProductVariant, Tax, Plan
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory
+from .models import (
+    QuotationTemplate,
+    QuotationTemplateLine,
+    Subscription,
+    SubscriptionLine,
+    SubscriptionStatusHistory,
+    DiscountRule,
+)
 
 class SubscriptionLifecycleAndTransitionsTests(TestCase):
     def setUp(self):
@@ -357,3 +364,237 @@ class SubscriptionCustomerPermissionIsolationTests(TestCase):
         self.client.force_login(self.customer2)
         response = self.client.get(reverse('subscriptions:subscription_detail', kwargs={'pk': self.sub_alice.pk}))
         self.assertEqual(response.status_code, 403)
+
+
+class DiscountRulesAndServiceTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(
+            email='shopper@customer.com',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.plan = Plan.objects.create(name="Pro Plan", price=Decimal('100.00'))
+        self.prod_crm = Product.objects.create(name="CRM Module", sales_price=Decimal('100.00'))
+        self.prod_hr = Product.objects.create(name="HR Module", sales_price=Decimal('50.00'))
+
+        self.sub = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            status=Subscription.Status.ACTIVE
+        )
+        # Line 1: 2x CRM Module @ 100.00 = 200.00
+        SubscriptionLine.objects.create(
+            subscription=self.sub,
+            product=self.prod_crm,
+            quantity=2,
+            unit_price=Decimal('100.00')
+        )
+        # Line 2: 1x HR Module @ 50.00 = 50.00
+        SubscriptionLine.objects.create(
+            subscription=self.sub,
+            product=self.prod_hr,
+            quantity=1,
+            unit_price=Decimal('50.00')
+        )
+        # Total subtotal = 250.00, total quantity = 3
+
+    def test_model_validation_rules(self):
+        # Value must be positive
+        rule_zero = DiscountRule(name="Zero Discount", value=Decimal('0.00'))
+        with self.assertRaises(ValidationError):
+            rule_zero.full_clean()
+
+        # Percentage cannot exceed 100%
+        rule_excess = DiscountRule(
+            name="120% Discount",
+            discount_type=DiscountRule.DiscountType.PERCENTAGE,
+            value=Decimal('120.00')
+        )
+        with self.assertRaises(ValidationError):
+            rule_excess.full_clean()
+
+        # End date before start date rejected
+        rule_dates = DiscountRule(
+            name="Date Inverted",
+            value=Decimal('10.00'),
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 5, 1)
+        )
+        with self.assertRaises(ValidationError):
+            rule_dates.full_clean()
+
+        # Usage limit must be at least 1
+        rule_limit = DiscountRule(
+            name="Limit Zero",
+            value=Decimal('10.00'),
+            usage_limit=0
+        )
+        with self.assertRaises(ValidationError):
+            rule_limit.full_clean()
+
+    def test_percentage_discount_whole_subscription_calculation(self):
+        from subscriptions.services import get_applicable_discounts
+        rule = DiscountRule.objects.create(
+            name="Save 10%",
+            discount_type=DiscountRule.DiscountType.PERCENTAGE,
+            value=Decimal('10.00'),
+            scope=DiscountRule.Scope.WHOLE_SUBSCRIPTION
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 1)
+        # 10% of $250.00 = $25.00
+        self.assertEqual(discounts[0].calculated_amount, Decimal('25.00'))
+        self.assertEqual(discounts[0].rule, rule)
+
+    def test_fixed_discount_cannot_make_amount_negative(self):
+        from subscriptions.services import get_applicable_discounts
+        # Fixed $300.00 discount on a $250.00 subscription
+        rule = DiscountRule.objects.create(
+            name="Huge Fixed $300",
+            discount_type=DiscountRule.DiscountType.FIXED,
+            value=Decimal('300.00'),
+            scope=DiscountRule.Scope.WHOLE_SUBSCRIPTION
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 1)
+        # Should be capped at $250.00 (the eligible amount) so line/total is never negative
+        self.assertEqual(discounts[0].calculated_amount, Decimal('250.00'))
+
+    def test_expired_discount_is_ignored(self):
+        from subscriptions.services import get_applicable_discounts
+        yesterday = date.today() - timedelta(days=1)
+        DiscountRule.objects.create(
+            name="Expired Promo",
+            value=Decimal('20.00'),
+            end_date=yesterday
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 0)
+
+    def test_usage_limit_reached_is_ignored(self):
+        from subscriptions.services import get_applicable_discounts
+        rule = DiscountRule.objects.create(
+            name="Limited Coupons",
+            value=Decimal('15.00'),
+            usage_limit=5,
+            times_used=5 # Limit reached!
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 0)
+
+        # But if times_used < usage_limit, it applies
+        rule.times_used = 4
+        rule.save()
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 1)
+
+    def test_below_minimum_purchase_is_ignored(self):
+        from subscriptions.services import get_applicable_discounts
+        # Subtotal is $250.00
+        DiscountRule.objects.create(
+            name="High Roller Discount",
+            value=Decimal('50.00'),
+            min_purchase_amount=Decimal('500.00') # Higher than 250
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 0)
+
+    def test_below_minimum_quantity_is_ignored(self):
+        from subscriptions.services import get_applicable_discounts
+        # Total seats = 3
+        DiscountRule.objects.create(
+            name="Bulk 10 Seats",
+            value=Decimal('15.00'),
+            min_quantity=10 # Higher than 3
+        )
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 0)
+
+    def test_product_scoped_discount(self):
+        from subscriptions.services import get_applicable_discounts
+        # Create discount strictly for CRM Module
+        rule = DiscountRule.objects.create(
+            name="CRM 20% Off",
+            discount_type=DiscountRule.DiscountType.PERCENTAGE,
+            value=Decimal('20.00'),
+            scope=DiscountRule.Scope.SPECIFIC_PRODUCTS
+        )
+        rule.products.add(self.prod_crm)
+
+        # CRM Module line is 2x $100 = $200.00 (HR module $50 should NOT be discounted)
+        discounts = get_applicable_discounts(self.sub, billing_date=date.today())
+        self.assertEqual(len(discounts), 1)
+        # 20% of $200.00 = $40.00
+        self.assertEqual(discounts[0].calculated_amount, Decimal('40.00'))
+        self.assertEqual(discounts[0].eligible_amount, Decimal('200.00'))
+
+
+class DiscountPermissionAndAccessTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_superuser(
+            email='admin@brightloop.com',
+            password='AdminPassword@1'
+        )
+        self.staff = User.objects.create_user(
+            email='staff@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.customer = User.objects.create_user(
+            email='customer@brightloop.com',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.rule = DiscountRule.objects.create(
+            name="Welcome Discount",
+            value=Decimal('10.00')
+        )
+
+    def test_unauthenticated_user_redirected(self):
+        response = self.client.get(reverse('subscriptions:discount_list'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_customer_forbidden(self):
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('subscriptions:discount_list'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_can_view_discounts(self):
+        self.client.force_login(self.staff)
+        # Can view list
+        response = self.client.get(reverse('subscriptions:discount_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Welcome Discount")
+
+        # Can view detail
+        response = self.client.get(reverse('subscriptions:discount_detail', kwargs={'pk': self.rule.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_staff_cannot_create_edit_delete_discounts(self):
+        self.client.force_login(self.staff)
+        # Cannot create
+        response = self.client.get(reverse('subscriptions:discount_create'))
+        self.assertEqual(response.status_code, 403)
+
+        # Cannot edit
+        response = self.client.get(reverse('subscriptions:discount_edit', kwargs={'pk': self.rule.pk}))
+        self.assertEqual(response.status_code, 403)
+
+        # Cannot delete
+        response = self.client.post(reverse('subscriptions:discount_delete', kwargs={'pk': self.rule.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_create_discount(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('subscriptions:discount_create'), {
+            'name': 'Black Friday 25%',
+            'discount_type': 'percentage',
+            'value': '25.00',
+            'min_purchase_amount': '0.00',
+            'min_quantity': '0',
+            'scope': 'whole_subscription',
+            'is_active': True,
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(DiscountRule.objects.filter(name='Black Friday 25%').exists())

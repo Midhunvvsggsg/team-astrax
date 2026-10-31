@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory
+from .models import QuotationTemplate, QuotationTemplateLine, Subscription, SubscriptionLine, SubscriptionStatusHistory, DiscountRule
 
 class QuotationTemplateLineInline(admin.TabularInline):
     model = QuotationTemplateLine
@@ -29,3 +29,10 @@ class SubscriptionAdmin(admin.ModelAdmin):
     search_fields = ('subscription_number', 'customer__email', 'plan__name')
     readonly_fields = ('subscription_number', 'created_at', 'updated_at')
     inlines = [SubscriptionLineInline, SubscriptionStatusHistoryInline]
+
+@admin.register(DiscountRule)
+class DiscountRuleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'discount_type', 'value', 'scope', 'times_used', 'usage_limit', 'is_active')
+    list_filter = ('discount_type', 'scope', 'is_active')
+    search_fields = ('name',)
+    filter_horizontal = ('products',)

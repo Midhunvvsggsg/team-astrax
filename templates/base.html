@@ -33,6 +33,7 @@
             <li><a href="{% url 'catalog:product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">Products</a></li>
             <li><a href="{% url 'catalog:plan_list' %}" class="nav-link {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">Plans</a></li>
             <li><a href="{% url 'catalog:tax_list' %}" class="nav-link {% if 'tax' in request.resolver_match.url_name %}active{% endif %}">Taxes</a></li>
+            <li><a href="{% url 'subscriptions:discount_list' %}" class="nav-link {% if 'discount' in request.resolver_match.url_name %}active{% endif %}">Discounts</a></li>
             {% if user.is_admin %}
               <li><a href="{% url 'staff_management' %}" class="nav-link {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">Staff Management</a></li>
             {% endif %}
