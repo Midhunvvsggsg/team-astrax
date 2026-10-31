@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ subscription.subscription_number }} - Subscription Details{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: var(--space-16);">
+  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'subscriptions:subscription_list' %}{% endif %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+    ← Back
+  </a>
+</div>
+
+<!-- Header Card -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
+    <div>
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+        <span class="badge badge-sub-{{ subscription.status }}" style="font-size: var(--font-size-sm); padding: var(--space-4) var(--space-16);">
+          {{ subscription.get_status_display }}
+        </span>
+        <span class="badge" style="background: var(--color-surface-muted);">{{ subscription.plan.name }}</span>
+      </div>
+      <h1 class="card-title">{{ subscription.subscription_number }}</h1>
+      <p class="card-subtitle">
+        Customer: <strong>{{ subscription.customer.full_name }}</strong> ({{ subscription.customer.email }})
+      </p>
+    </div>
+
+    <!-- Action transition buttons for Staff & Admin -->
+    {% if not user.is_customer %}
+      <div style="display: flex; gap: var(--space-8); flex-wrap: wrap; align-items: center;">
+        {% if subscription.status in 'draft,quotation' %}
+          <a href="{% url 'subscriptions:subscription_edit' pk=subscription.pk %}" class="btn btn-secondary">Edit Details</a>
+        {% endif %}
+
+        {% for action_code, action_label, btn_class in available_actions %}
+          {% if action_code == 'renew' %}
+            <form action="{% url 'subscriptions:subscription_renew' pk=subscription.pk %}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn {{ btn_class }}" onclick="return confirm('Renew this subscription for another billing cycle?')">
+                ↻ {{ action_label }}
+              </button>
+            </form>
+          {% else %}
+            <form action="{% url 'subscriptions:subscription_transition' pk=subscription.pk %}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="new_status" value="{{ action_code }}">
+              <button type="submit" class="btn {{ btn_class }}">
+                {{ action_label }}
+              </button>
+            </form>
+          {% endif %}
+        {% endfor %}
+
+        {% if subscription.status == 'draft' and user.is_admin %}
+          <a href="{% url 'subscriptions:subscription_delete' pk=subscription.pk %}" class="btn btn-danger">Delete Draft</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Subscription Metadata Grid -->
+  <div class="grid-2" style="margin-top: var(--space-24); border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Start Date:</span>
+          <strong>{{ subscription.start_date|date:"F d, Y" }}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Expiry Date:</span>
+          <strong>{{ subscription.expiry_date|date:"F d, Y"|default:"Continuous / Open" }}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Payment Terms:</span>
+          <span>{{ subscription.get_payment_terms_display }}</span>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-sm);">
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Billing Interval:</span>
+          <strong>{{ subscription.plan.get_billing_period_display }}</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Plan Min Quantity:</span>
+          <span>{{ subscription.plan.minimum_quantity }} seat{{ subscription.plan.minimum_quantity|pluralize }}</span>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-muted);">Allowed Plan Flags:</span>
+          <div style="display: flex; gap: var(--space-4);">
+            {% if subscription.plan.pausable %}<span class="badge" style="font-size: 0.65rem; background: var(--color-surface-muted);">Pausable</span>{% endif %}
+            {% if subscription.plan.closable_early %}<span class="badge" style="font-size: 0.65rem; background: var(--color-surface-muted);">Early Close</span>{% endif %}
+            {% if subscription.plan.renewable %}<span class="badge" style="font-size: 0.65rem; background: var(--color-surface-muted);">Renewable</span>{% endif %}
+            {% if subscription.plan.auto_close_on_end %}<span class="badge" style="font-size: 0.65rem; background: #fef3c7; color: #92400e;">Auto-Close</span>{% endif %}
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Subscription Product Lines -->
+<div class="card" style="margin-bottom: var(--space-24);">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h2 class="card-title">Product & Service Lines</h2>
+      <p class="card-subtitle">Enforcing plan minimum quantity of {{ subscription.plan.minimum_quantity }} seats</p>
+    </div>
+    <div>
+      <span class="badge" style="background: var(--color-surface-muted);">Total Quantity: {{ subscription.total_quantity }}</span>
+    </div>
+  </div>
+
+  {% if lines %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product / Service</th>
+            <th>Variant Option</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Tax</th>
+            <th>Subtotal</th>
+            <th>Line Total</th>
+            {% if not user.is_customer and subscription.status in 'draft,quotation' %}
+              <th style="text-align: right;">Action</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+            <tr>
+              <td><strong>{{ line.product.name }}</strong></td>
+              <td>
+                {% if line.variant %}
+                  <span class="badge" style="background: var(--color-surface-muted);">
+                    {{ line.variant.attribute }}: {{ line.variant.value }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">Standard</span>
+                {% endif %}
+              </td>
+              <td>{{ line.quantity }}</td>
+              <td>${{ line.unit_price }}</td>
+              <td>
+                {% if line.tax %}
+                  <span style="font-size: var(--font-size-xs);">{{ line.tax.name }} (+${{ line.line_tax_amount }})</span>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);">$0.00</span>
+                {% endif %}
+              </td>
+              <td>${{ line.line_subtotal }}</td>
+              <td><strong style="color: var(--color-primary);">${{ line.line_total }}</strong></td>
+              {% if not user.is_customer and subscription.status in 'draft,quotation' %}
+                <td style="text-align: right;">
+                  <form action="{% url 'subscriptions:line_delete' pk=line.pk %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger" style="padding: 2px 6px; font-size: 0.7rem;" onclick="return confirm('Remove this line?')">✕</button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals Summary -->
+    <div style="display: flex; justify-content: flex-end; margin-top: var(--space-24);">
+      <div style="min-width: 280px; background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
+          <span>Subtotal:</span>
+          <span>${{ subscription.subtotal }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
+          <span>Taxes:</span>
+          <span>+${{ subscription.total_tax }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: var(--space-8); font-size: var(--font-size-lg); font-weight: 700;">
+          <span>Total:</span>
+          <span style="color: var(--color-primary);">${{ subscription.total_amount }}</span>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3 class="empty-state-title">No Product Lines Added</h3>
+      <p class="empty-state-desc">Add product lines to calculate recurring fees and taxes for this subscription.</p>
+    </div>
+  {% endif %}
+
+  <!-- Add Line Form (Staff/Admin when in Draft or Quotation) -->
+  {% if line_form and not user.is_customer %}
+    <div style="margin-top: var(--space-24); padding-top: var(--space-24); border-top: 1px solid var(--color-border);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-16);">+ Add Product Line</h3>
+      <form action="{% url 'subscriptions:line_create' subscription_pk=subscription.pk %}" method="post" style="display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-end;">
+        {% csrf_token %}
+        <div style="flex: 2; min-width: 200px;">
+          <label class="form-label">Product *</label>
+          {{ line_form.product }}
+        </div>
+        <div style="flex: 2; min-width: 160px;">
+          <label class="form-label">Variant (Optional)</label>
+          {{ line_form.variant }}
+        </div>
+        <div style="flex: 1; min-width: 80px;">
+          <label class="form-label">Quantity *</label>
+          {{ line_form.quantity }}
+        </div>
+        <div style="flex: 1; min-width: 100px;">
+          <label class="form-label">Unit Price ($) *</label>
+          {{ line_form.unit_price }}
+        </div>
+        <div style="flex: 1.5; min-width: 140px;">
+          <label class="form-label">Tax</label>
+          {{ line_form.tax }}
+        </div>
+        <div>
+          <button type="submit" class="btn btn-primary">+ Add Line</button>
+        </div>
+      </form>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Status History (Who / When) -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Status Transition History</h2>
+    <p class="card-subtitle">Audited record of all lifecycle changes</p>
+  </div>
+
+  {% if history %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>From Status</th>
+            <th>To Status</th>
+            <th>Changed By</th>
+            <th>Timestamp</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in history %}
+            <tr>
+              <td><span class="badge" style="background: var(--color-surface-muted);">{{ h.from_status|upper }}</span></td>
+              <td><span class="badge badge-sub-{{ h.to_status }}">{{ h.to_status|upper }}</span></td>
+              <td>{{ h.changed_by.email|default:"System Scheduled Job" }}</td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ h.changed_at|date:"M d, Y H:i" }}
+              </td>
+              <td>{{ h.notes|default:"-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p class="empty-state-desc">No status transitions recorded yet.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
