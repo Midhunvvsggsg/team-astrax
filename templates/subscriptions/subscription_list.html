@@ -11,13 +11,16 @@
       <p class="card-subtitle">Manage lifecycle from quotation to active billing and renewal.</p>
     </div>
     <div style="display: flex; gap: var(--space-8); flex-wrap: wrap;">
-      <a href="{% url 'subscriptions:subscription_from_template' %}" class="btn btn-secondary">⚡ From Template</a>
+      <a href="{% url 'subscriptions:subscription_from_template' %}" class="btn btn-secondary">
+        <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        From Template
+      </a>
       <a href="{% url 'subscriptions:subscription_create' %}" class="btn btn-primary">+ New Subscription</a>
     </div>
   </div>
 
   <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-24);">
     <div style="flex: 1; min-width: 220px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by number, customer, plan...">
     </div>
@@ -78,7 +81,7 @@
                   {{ sub.total_quantity }} seats
                 </span>
               </td>
-              <td><strong style="color: var(--color-primary);">${{ sub.total_amount }}</strong></td>
+              <td><strong style="color: var(--color-primary);">{{ sub.total_amount|currency }}</strong></td>
               <td style="font-size: var(--font-size-xs);">
                 {% if sub.expiry_date %}
                   <span {% if sub.is_expired and sub.status == 'active' %}style="color: var(--color-danger); font-weight: 600;"{% endif %}>

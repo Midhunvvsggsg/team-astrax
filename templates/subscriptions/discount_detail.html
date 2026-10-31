@@ -29,7 +29,7 @@
       <h1 class="card-title">{{ discount.name }}</h1>
       <p class="card-subtitle">
         Discount: <strong style="color: var(--color-success); font-size: var(--font-size-lg);">
-          {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-${{ discount.value }} OFF{% endif %}
+          {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-{{ discount.value|currency }} OFF{% endif %}
         </strong>
       </p>
     </div>
@@ -51,11 +51,11 @@
         </li>
         <li style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Value:</span>
-          <strong>{% if discount.discount_type == 'percentage' %}{{ discount.value }}%{% else %}${{ discount.value }}{% endif %}</strong>
+          <strong>{% if discount.discount_type == 'percentage' %}{{ discount.value }}%{% else %}{{ discount.value|currency }}{% endif %}</strong>
         </li>
         <li style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Min Purchase:</span>
-          <span>${{ discount.min_purchase_amount }}</span>
+          <span>{{ discount.min_purchase_amount|currency }}</span>
         </li>
         <li style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Min Quantity:</span>
@@ -104,7 +104,7 @@
               <tr>
                 <td><strong>{{ prod.name }}</strong></td>
                 <td><span class="badge" style="background: var(--color-surface-muted);">{{ prod.get_product_type_display }}</span></td>
-                <td>${{ prod.sales_price }}</td>
+                <td>{{ prod.sales_price|currency }}</td>
               </tr>
             {% endfor %}
           </tbody>

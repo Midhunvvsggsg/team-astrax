@@ -16,7 +16,7 @@
   </div>
 
   <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-24);">
     <div style="flex: 1; min-width: 220px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by name or notes...">
     </div>
@@ -72,8 +72,8 @@
                 {% endif %}
               </td>
               <td><span class="badge" style="background: var(--color-surface-muted);">{{ product.get_product_type_display }}</span></td>
-              <td><strong>${{ product.sales_price }}</strong></td>
-              <td style="color: var(--color-text-muted);">${{ product.cost_price }}</td>
+              <td><strong>{{ product.sales_price|currency }}</strong></td>
+              <td style="color: var(--color-text-muted);">{{ product.cost_price|currency }}</td>
               <td>
                 <span class="badge" style="background: #e0f2fe; color: #0369a1;">
                   {{ product.variants.count }} variant{{ product.variants.count|pluralize }}

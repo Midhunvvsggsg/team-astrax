@@ -38,11 +38,11 @@
   <div class="grid-2" style="margin-top: var(--space-24); border-top: 1px solid var(--color-border); padding-top: var(--space-16);">
     <div>
       <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase;">Base Sales Price</p>
-      <p style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-primary);">${{ product.sales_price }}</p>
+      <p class="kpi-value" style="color: var(--color-primary);">{{ product.sales_price|currency }}</p>
     </div>
     <div>
       <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase;">Cost Price</p>
-      <p style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text-muted);">${{ product.cost_price }}</p>
+      <p class="kpi-value" style="color: var(--color-text-muted);">{{ product.cost_price|currency }}</p>
     </div>
   </div>
 
@@ -80,8 +80,8 @@
               <tr>
                 <td><strong>{{ variant.attribute }}</strong></td>
                 <td><span class="badge" style="background: var(--color-surface-muted);">{{ variant.value }}</span></td>
-                <td style="color: var(--color-success); font-weight: 600;">+${{ variant.extra_price }}</td>
-                <td><strong style="color: var(--color-primary);">${{ variant.final_price }}</strong></td>
+                <td style="color: var(--color-success); font-weight: 600;">+{{ variant.extra_price|currency }}</td>
+                <td><strong style="color: var(--color-primary);">{{ variant.final_price|currency }}</strong></td>
                 {% if user.is_admin %}
                   <td style="text-align: right;">
                     <a href="{% url 'catalog:variant_edit' pk=variant.pk %}" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.7rem;">Edit</a>
@@ -95,7 +95,9 @@
       </div>
     {% else %}
       <div class="empty-state">
-        <div class="empty-state-icon">🏷️</div>
+        <div class="empty-state-icon">
+          <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="32" height="32"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+        </div>
         <h3 class="empty-state-title">No Variants Added</h3>
         <p class="empty-state-desc">
           This product uses standard base pricing. Add variants (e.g. Brand=Odoo adds $560.00) to configure options.
@@ -130,7 +132,7 @@
         <div class="form-group">
           <label class="form-label">Extra Price ($) *</label>
           {{ variant_form.extra_price }}
-          <p class="form-help">Amount added on top of base ${{ product.sales_price }}</p>
+          <p class="form-help">Amount added on top of base {{ product.sales_price|currency }}</p>
         </div>
 
         <div class="form-group" style="display: flex; align-items: center; gap: var(--space-8);">

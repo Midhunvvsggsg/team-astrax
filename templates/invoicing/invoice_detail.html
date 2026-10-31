@@ -18,7 +18,8 @@
 <div style="margin-bottom: var(--space-16); display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
   <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
     <a href="{% url 'invoicing:invoice_print' pk=invoice.pk %}" class="btn btn-secondary" target="_blank">
-      🖨️ Print / PDF
+      <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+      Print / PDF
     </a>
 
     {% if not user.is_customer %}
@@ -26,7 +27,8 @@
       <form action="{% url 'invoicing:invoice_send' pk=invoice.pk %}" method="post" style="display:inline;">
         {% csrf_token %}
         <button type="submit" class="btn btn-secondary" title="Email invoice to customer">
-          ✉️ {% if invoice.sent_at %}Resend Email{% else %}Send Email{% endif %}
+          <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          {% if invoice.sent_at %}Resend Email{% else %}Send Email{% endif %}
         </button>
       </form>
     {% endif %}
@@ -46,7 +48,8 @@
         {% endif %}
         {% if invoice.sent_at %}
           <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: var(--color-success); border: 1px solid var(--color-success);">
-            ✉️ Sent on {{ invoice.sent_at|date:"M d, Y H:i" }}
+            <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="12" height="12" style="vertical-align: -1px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            Sent on {{ invoice.sent_at|date:"M d, Y H:i" }}
           </span>
         {% endif %}
       </div>
@@ -150,22 +153,22 @@
           <tr>
             <td><strong>{{ line.description }}</strong></td>
             <td>{{ line.quantity }}</td>
-            <td>${{ line.unit_price }}</td>
+            <td>{{ line.unit_price|currency }}</td>
             <td>
               {% if line.discount_amount > 0 %}
-                <span style="color: var(--color-success); font-weight: 600;">-${{ line.discount_amount }}</span>
+                <span style="color: var(--color-success); font-weight: 600;">-{{ line.discount_amount|currency }}</span>
               {% else %}
                 <span style="color: var(--color-text-muted);">$0.00</span>
               {% endif %}
             </td>
             <td>
               {% if line.tax %}
-                <span style="font-size: var(--font-size-xs);">{{ line.tax.name }} (+${{ line.tax_amount }})</span>
+                <span style="font-size: var(--font-size-xs);">{{ line.tax.name }} (+{{ line.tax_amount|currency }})</span>
               {% else %}
                 <span style="color: var(--color-text-muted);">$0.00</span>
               {% endif %}
             </td>
-            <td><strong>${{ line.amount }}</strong></td>
+            <td><strong>{{ line.amount|currency }}</strong></td>
           </tr>
         {% endfor %}
       </tbody>
@@ -177,27 +180,27 @@
     <div style="min-width: 320px; background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md);">
       <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
         <span style="color: var(--color-text-muted);">Subtotal:</span>
-        <span>${{ invoice.subtotal }}</span>
+        <span>{{ invoice.subtotal|currency }}</span>
       </div>
       <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm); color: var(--color-success);">
         <span>Applied Discounts:</span>
-        <span>-${{ invoice.discount_total }}</span>
+        <span>-{{ invoice.discount_total|currency }}</span>
       </div>
       <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
         <span style="color: var(--color-text-muted);">Taxes:</span>
-        <span>+${{ invoice.tax_total }}</span>
+        <span>+{{ invoice.tax_total|currency }}</span>
       </div>
       <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: var(--space-8); font-size: var(--font-size-xl); font-weight: 800;">
         <span>Grand Total:</span>
-        <span style="color: var(--color-primary);">${{ invoice.grand_total }}</span>
+        <span style="color: var(--color-primary);">{{ invoice.grand_total|currency }}</span>
       </div>
       <div style="display: flex; justify-content: space-between; margin-top: var(--space-8); font-size: var(--font-size-sm); color: var(--color-success); font-weight: 600;">
         <span>Total Paid:</span>
-        <span>${{ invoice.amount_paid }}</span>
+        <span>{{ invoice.amount_paid|currency }}</span>
       </div>
       <div style="display: flex; justify-content: space-between; margin-top: var(--space-4); font-size: var(--font-size-base); font-weight: 700; {% if invoice.amount_due > 0 %}color: var(--color-danger);{% else %}color: var(--color-success);{% endif %}">
         <span>Balance Due:</span>
-        <span>${{ invoice.amount_due }}</span>
+        <span>{{ invoice.amount_due|currency }}</span>
       </div>
     </div>
   </div>
@@ -213,7 +216,7 @@
     <div style="font-size: var(--font-size-sm);">
       <strong>Balance Due:</strong>
       <span style="font-weight: 800; {% if invoice.amount_due > 0 %}color: var(--color-danger);{% else %}color: var(--color-success);{% endif %}">
-        ${{ invoice.amount_due }}
+        {{ invoice.amount_due|currency }}
       </span>
     </div>
   </div>
@@ -235,7 +238,7 @@
             <tr>
               <td>{{ p.date|date:"M d, Y" }}</td>
               <td><span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--color-primary); font-weight: 600;">{{ p.get_method_display }}</span></td>
-              <td><strong style="color: var(--color-success);">${{ p.amount }}</strong></td>
+              <td><strong style="color: var(--color-success);">{{ p.amount|currency }}</strong></td>
               <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
                 {{ p.recorded_by.email|default:"System" }}
               </td>

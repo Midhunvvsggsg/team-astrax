@@ -51,11 +51,11 @@
         <tbody>
           {% for tax in page_obj %}
             <tr>
-              <td><strong>{{ tax.name }}</strong></td>
+              <td>{{ tax.name }}</td>
               <td>{{ tax.percentage }}%</td>
-              <td>${{ tax.fixed_amount }}</td>
+              <td>{{ tax.fixed_amount|currency }}</td>
               <td style="color: var(--color-primary); font-weight: 600;">
-                ${{ tax.percentage|floatformat:2 }} + ${{ tax.fixed_amount }}
+                {{ tax.percentage|floatformat:2 }}% + {{ tax.fixed_amount|currency }}
               </td>
               <td>
                 {% if tax.is_active %}

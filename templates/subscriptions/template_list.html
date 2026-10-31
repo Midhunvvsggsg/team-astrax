@@ -40,7 +40,7 @@
               </td>
               <td>
                 {% if tmpl.plan %}
-                  <strong>{{ tmpl.plan.name }}</strong> (${{ tmpl.plan.price }}/{{ tmpl.plan.get_billing_period_display }})
+                  <strong>{{ tmpl.plan.name }}</strong> ({{ tmpl.plan.price|currency }}/{{ tmpl.plan.get_billing_period_display }})
                 {% else %}
                   <span style="color: var(--color-text-muted);">None</span>
                 {% endif %}

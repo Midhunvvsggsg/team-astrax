@@ -65,6 +65,9 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'automation.context_processors.demo_clock_context',
             ],
+            'builtins': [
+                'invoicing.templatetags.finance_tags',
+            ],
         },
     },
 ]

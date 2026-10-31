@@ -12,20 +12,23 @@
     </div>
     <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
       <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary" style="position: relative;">
-        ⚠️ Overdue
+        <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Overdue
         {% if overdue_count > 0 %}
           <span class="badge badge-overdue" style="margin-left: 4px; padding: 2px 6px; font-size: 0.7rem;">{{ overdue_count }}</span>
         {% endif %}
       </a>
       <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">
-        💳 Payments
+        <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        Payments
       </a>
       <!-- Run Billing Form Button -->
       <form action="{% url 'invoicing:run_billing' %}" method="post" style="display: flex; gap: var(--space-8); align-items: center;">
         {% csrf_token %}
         <input type="date" name="as_of_date" value="{{ today|date:'Y-m-d' }}" class="form-input" style="width: 145px; padding: 6px 10px; font-size: 0.8rem;" title="Target Billing Date">
         <button type="submit" class="btn btn-primary" onclick="return confirm('Execute automated recurring billing for all active subscriptions up to the selected date?')">
-          ⚡ Run Billing Engine
+          <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Run Billing Engine
         </button>
       </form>
     </div>
@@ -37,13 +40,13 @@
       All Invoices
     </a>
     <a href="{% url 'invoicing:invoice_list' %}?status=paid" class="btn {% if status_filter == 'paid' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
-      ✓ Paid
+      Paid
     </a>
     <a href="{% url 'invoicing:invoice_list' %}?status=outstanding" class="btn {% if status_filter == 'outstanding' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
-      ⏳ Outstanding
+      Outstanding
     </a>
     <a href="{% url 'invoicing:invoice_list' %}?status=overdue" class="btn {% if status_filter == 'overdue' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
-      ⚠️ Overdue {% if overdue_count > 0 %}({{ overdue_count }}){% endif %}
+      Overdue {% if overdue_count > 0 %}({{ overdue_count }}){% endif %}
     </a>
     <a href="{% url 'invoicing:invoice_list' %}?status=confirmed" class="btn {% if status_filter == 'confirmed' %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 4px 12px; font-size: 0.75rem;">
       Confirmed
@@ -54,7 +57,7 @@
   </div>
 
   <!-- Search & Detailed Filters -->
-  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-16); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-16);">
     <div style="flex: 1; min-width: 200px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search invoice #, customer, sub #...">
     </div>
@@ -140,20 +143,20 @@
                   </div>
                 {% endif %}
               </td>
-              <td style="color: var(--color-text-muted);">${{ inv.subtotal }}</td>
+              <td style="color: var(--color-text-muted);">{{ inv.subtotal|currency }}</td>
               <td style="color: var(--color-success); font-size: var(--font-size-xs);">
-                {% if inv.discount_total > 0 %}-${{ inv.discount_total }}{% else %}$0.00{% endif %}
+                {% if inv.discount_total > 0 %}-{{ inv.discount_total|currency }}{% else %}$0.00{% endif %}
               </td>
-              <td style="font-size: var(--font-size-xs);">${{ inv.tax_total }}</td>
+              <td style="font-size: var(--font-size-xs);">{{ inv.tax_total|currency }}</td>
               <td>
-                <strong style="color: var(--color-primary); font-size: var(--font-size-base);">${{ inv.grand_total }}</strong>
+                <strong style="color: var(--color-primary); font-size: var(--font-size-base);">{{ inv.grand_total|currency }}</strong>
               </td>
               <td style="font-size: var(--font-size-xs); white-space: nowrap;">
                 {% if inv.amount_paid > 0 %}
-                  <div style="color: var(--color-success); font-weight: 600;">Paid: ${{ inv.amount_paid }}</div>
+                  <div style="color: var(--color-success); font-weight: 600;">Paid: {{ inv.amount_paid|currency }}</div>
                 {% endif %}
                 {% if inv.amount_due > 0 %}
-                  <div style="color: var(--color-danger); font-weight: 600;">Due: ${{ inv.amount_due }}</div>
+                  <div style="color: var(--color-danger); font-weight: 600;">Due: {{ inv.amount_due|currency }}</div>
                 {% else %}
                   <div style="color: var(--color-success); font-weight: 700;">Settled</div>
                 {% endif %}
@@ -162,7 +165,10 @@
                 <div style="display: flex; flex-direction: column; gap: var(--space-4);">
                   <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
                   {% if inv.sent_at %}
-                    <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success); font-size: 0.65rem;" title="Sent on {{ inv.sent_at|date:'M d, Y H:i' }}">✉️ Sent</span>
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success); font-size: 0.65rem;" title="Sent on {{ inv.sent_at|date:'M d, Y H:i' }}">
+                      <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="10" height="10" style="vertical-align: -1px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                      Sent
+                    </span>
                   {% endif %}
                 </div>
               </td>

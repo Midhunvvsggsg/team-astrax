@@ -17,7 +17,7 @@
   <div class="card">
     <div class="card-header">
       <h1 class="card-title">Edit Pricing Variant</h1>
-      <p class="card-subtitle">For product: <strong>{{ product.name }}</strong> (Base: ${{ product.sales_price }})</p>
+      <p class="card-subtitle">For product: <strong>{{ product.name }}</strong> (Base: {{ product.sales_price|currency }})</p>
     </div>
 
     <form method="post" novalidate>

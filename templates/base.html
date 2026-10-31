@@ -10,73 +10,177 @@
 </head>
 <body>
   <!-- Header / Navigation -->
-  <header class="navbar">
+  <header class="navbar" id="mainNavbar">
     <div class="container nav-container">
-      <a href="{% url 'home' %}" class="nav-brand">
-        Brightloop <span class="badge-logo">Subscriptions</span>
-      </a>
+      <div class="nav-left">
+        <a href="{% url 'home' %}" class="nav-brand">
+          Brightloop <span class="badge-logo">Subscriptions</span>
+        </a>
+      </div>
 
-      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
-        ☰
+      <!-- Hamburger toggle button (visible below 1024px) -->
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg class="icon-hamburger" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+        <svg class="icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
       </button>
 
-      <ul class="nav-links" id="navMenu">
-        {% if not user.is_authenticated %}
-          <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
-        {% endif %}
-
-        {% if user.is_authenticated %}
-          {% if user.is_customer %}
-            <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions & Invoices</a></li>
+      <!-- Nav Menu / Drawer -->
+      <div class="nav-drawer" id="navMenu">
+        <ul class="nav-links">
+          {% if not user.is_authenticated %}
+            <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
+          {% elif user.is_customer %}
+            <li><a href="{% url 'customer_portal' %}" class="nav-link {% if request.resolver_match.url_name == 'customer_portal' %}active{% endif %}">My Subscriptions &amp; Invoices</a></li>
             <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}">My Payments</a></li>
             <li><a href="{% url 'customer_profile' %}" class="nav-link {% if 'profile' in request.resolver_match.url_name or 'password' in request.resolver_match.url_name %}active{% endif %}">My Profile</a></li>
           {% elif user.is_staff_member or user.is_admin %}
-            <li><a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="{% url 'subscriptions:subscription_list' %}" class="nav-link {% if 'subscription' in request.resolver_match.url_name and request.resolver_match.url_name != 'customer_portal' %}active{% endif %}">Subscriptions</a></li>
-            <li><a href="{% url 'invoicing:invoice_list' %}" class="nav-link {% if 'invoice' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name %}active{% endif %}">Invoices</a></li>
-            <li><a href="{% url 'invoicing:payment_list' %}" class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">Payments</a></li>
-            <li><a href="{% url 'invoicing:reconciliation_dashboard' %}" class="nav-link {% if 'reconciliation' in request.resolver_match.url_name %}active{% endif %}">Reconciliation</a></li>
-            <li><a href="{% url 'invoicing:report_list' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}">Reports</a></li>
-            <li><a href="{% url 'subscriptions:template_list' %}" class="nav-link {% if 'template' in request.resolver_match.url_name %}active{% endif %}">Quotes & Templates</a></li>
-            <li><a href="{% url 'catalog:product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">Products</a></li>
-            <li><a href="{% url 'catalog:plan_list' %}" class="nav-link {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">Plans</a></li>
-            <li><a href="{% url 'catalog:tax_list' %}" class="nav-link {% if 'tax' in request.resolver_match.url_name %}active{% endif %}">Taxes</a></li>
-            <li><a href="{% url 'subscriptions:discount_list' %}" class="nav-link {% if 'discount' in request.resolver_match.url_name %}active{% endif %}">Discounts</a></li>
+            <!-- 1. Dashboard -->
+            <li>
+              <a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                Dashboard
+              </a>
+            </li>
+
+            <!-- 2. Sales Dropdown (Subscriptions, Quotes & Templates) -->
+            <li class="nav-item-dropdown">
+              <button type="button" class="nav-link nav-dropdown-toggle {% if 'subscription' in request.resolver_match.url_name or 'template' in request.resolver_match.url_name and request.resolver_match.url_name != 'customer_portal' %}active{% endif %}" aria-haspopup="true">
+                Sales <span class="dropdown-caret">▾</span>
+              </button>
+              <ul class="nav-dropdown-menu">
+                <li>
+                  <a href="{% url 'subscriptions:subscription_list' %}" class="dropdown-item {% if 'subscription' in request.resolver_match.url_name and request.resolver_match.url_name != 'customer_portal' and 'template' not in request.resolver_match.url_name %}active{% endif %}">
+                    Subscriptions
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'subscriptions:template_list' %}" class="dropdown-item {% if 'template' in request.resolver_match.url_name %}active{% endif %}">
+                    Quotes &amp; Templates
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- 3. Billing Dropdown (Invoices, Payments, Reconciliation) -->
+            <li class="nav-item-dropdown">
+              <button type="button" class="nav-link nav-dropdown-toggle {% if 'invoice' in request.resolver_match.url_name or 'payment' in request.resolver_match.url_name or 'reconciliation' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name and 'report' not in request.resolver_match.url_name %}active{% endif %}" aria-haspopup="true">
+                Billing <span class="dropdown-caret">▾</span>
+              </button>
+              <ul class="nav-dropdown-menu">
+                <li>
+                  <a href="{% url 'invoicing:invoice_list' %}" class="dropdown-item {% if 'invoice' in request.resolver_match.url_name or 'overdue' in request.resolver_match.url_name %}active{% endif %}">
+                    Invoices
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'invoicing:payment_list' %}" class="dropdown-item {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">
+                    Payments
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'invoicing:reconciliation_dashboard' %}" class="dropdown-item {% if 'reconciliation' in request.resolver_match.url_name %}active{% endif %}">
+                    Reconciliation
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- 4. Catalog Dropdown (Products, Plans, Taxes, Discounts) -->
+            <li class="nav-item-dropdown">
+              <button type="button" class="nav-link nav-dropdown-toggle {% if 'product' in request.resolver_match.url_name or 'plan' in request.resolver_match.url_name or 'tax' in request.resolver_match.url_name or 'discount' in request.resolver_match.url_name %}active{% endif %}" aria-haspopup="true">
+                Catalog <span class="dropdown-caret">▾</span>
+              </button>
+              <ul class="nav-dropdown-menu">
+                <li>
+                  <a href="{% url 'catalog:product_list' %}" class="dropdown-item {% if 'product' in request.resolver_match.url_name %}active{% endif %}">
+                    Products
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'catalog:plan_list' %}" class="dropdown-item {% if 'plan' in request.resolver_match.url_name %}active{% endif %}">
+                    Plans
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'catalog:tax_list' %}" class="dropdown-item {% if 'tax' in request.resolver_match.url_name %}active{% endif %}">
+                    Taxes
+                  </a>
+                </li>
+                <li>
+                  <a href="{% url 'subscriptions:discount_list' %}" class="dropdown-item {% if 'discount' in request.resolver_match.url_name %}active{% endif %}">
+                    Discounts
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- 5. Reports (Single Link) -->
+            <li>
+              <a href="{% url 'invoicing:report_list' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}">
+                Reports
+              </a>
+            </li>
+
+            <!-- 6. Admin Dropdown (Admin-Only: Staff Management, Automation) -->
             {% if user.is_admin %}
-              <li><a href="{% url 'staff_management' %}" class="nav-link {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">Staff Management</a></li>
-              <li><a href="{% url 'automation:dashboard' %}" class="nav-link {% if 'automation' in request.resolver_match.url_name %}active{% endif %}">Automation</a></li>
+              <li class="nav-item-dropdown">
+                <button type="button" class="nav-link nav-dropdown-toggle {% if request.resolver_match.url_name == 'staff_management' or 'automation' in request.resolver_match.url_name %}active{% endif %}" aria-haspopup="true">
+                  Admin <span class="dropdown-caret">▾</span>
+                </button>
+                <ul class="nav-dropdown-menu">
+                  <li>
+                    <a href="{% url 'staff_management' %}" class="dropdown-item {% if request.resolver_match.url_name == 'staff_management' %}active{% endif %}">
+                      Staff Management
+                    </a>
+                  </li>
+                  <li>
+                    <a href="{% url 'automation:dashboard' %}" class="dropdown-item {% if 'automation' in request.resolver_match.url_name %}active{% endif %}">
+                      Automation
+                    </a>
+                  </li>
+                </ul>
+              </li>
             {% endif %}
           {% endif %}
-        {% endif %}
+        </ul>
 
-        {% if user.is_authenticated %}
-          <li class="nav-user">
-            <span class="user-badge">
-              {{ user.email }}
-              <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
-            </span>
-          </li>
-          <li>
-            <form action="{% url 'logout' %}" method="post" style="display:inline;">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Sign Out</button>
-            </form>
-          </li>
-        {% else %}
-          <li><a href="{% url 'login' %}" class="btn btn-secondary">Sign In</a></li>
-          <li><a href="{% url 'signup' %}" class="btn btn-primary">Create Account</a></li>
-        {% endif %}
-      </ul>
+        <!-- User Menu on Right -->
+        <ul class="nav-user-menu">
+          {% if user.is_authenticated %}
+            <li class="nav-user">
+              <span class="user-badge" title="{{ user.email }}">
+                <span class="user-email-text">{{ user.email }}</span>
+                <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
+              </span>
+            </li>
+            <li>
+              <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-signout" style="padding: 4px 12px; font-size: 0.75rem;">Sign Out</button>
+              </form>
+            </li>
+          {% else %}
+            <li><a href="{% url 'login' %}" class="btn btn-secondary">Sign In</a></li>
+            <li><a href="{% url 'signup' %}" class="btn btn-primary">Create Account</a></li>
+          {% endif %}
+        </ul>
+      </div>
     </div>
   </header>
 
   <!-- Demo Clock Banner & Admin Controls -->
   {% if demo_clock.enabled %}
     {% if demo_clock.is_active or user.is_admin %}
-      <div id="demo-clock-banner" style="background: {% if demo_clock.is_active %}#fffbeb; border-bottom: 2px solid #f59e0b; color: #78350f;{% else %}#f8fafc; border-bottom: 1px solid #cbd5e1; color: #334155;{% endif %} padding: 8px 16px; font-size: 13px; z-index: 999; position: sticky; top: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div id="demo-clock-banner" style="background: {% if demo_clock.is_active %}#fffbeb; border-bottom: 2px solid #f59e0b; color: #78350f;{% else %}#f8fafc; border-bottom: 1px solid #cbd5e1; color: #334155;{% endif %} padding: 8px 16px; font-size: 13px; z-index: 99; position: sticky; top: 64px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100%;">
         <div class="container" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">⏱️</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="16" height="16" style="vertical-align: -2px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             {% if demo_clock.is_active %}
               <strong style="font-weight: 800; letter-spacing: 0.5px; color: #b45309;">DEMO CLOCK: {{ demo_clock.current_date|date:"Y-m-d" }}</strong>
               <span class="badge" style="background: #f59e0b; color: #fff; font-size: 10px; padding: 2px 6px; text-transform: uppercase; font-weight: 700;">Simulated</span>
@@ -167,14 +271,81 @@
   </footer>
 
   <script>
-    // Responsive Navbar Toggle
+    // Responsive Navbar Drawer & Hamburger Icon Toggle
     const navToggle = document.getElementById('navToggle');
     const navMenu = document.getElementById('navMenu');
+    const iconBurger = navToggle ? navToggle.querySelector('.icon-hamburger') : null;
+    const iconClose = navToggle ? navToggle.querySelector('.icon-close') : null;
+
     if (navToggle && navMenu) {
-      navToggle.addEventListener('click', () => {
-        navMenu.classList.toggle('show');
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenu.classList.toggle('show');
+        navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (iconBurger && iconClose) {
+          iconBurger.style.display = isOpen ? 'none' : 'block';
+          iconClose.style.display = isOpen ? 'block' : 'none';
+        }
       });
     }
+
+    // Dropdown Toggles (Click support for touch & desktop)
+    document.querySelectorAll('.nav-dropdown-toggle').forEach(toggle => {
+      toggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const parent = this.closest('.nav-item-dropdown');
+        if (!parent) return;
+
+        const wasOpen = parent.classList.contains('open');
+
+        // Close all other dropdowns
+        document.querySelectorAll('.nav-item-dropdown.open').forEach(item => {
+          if (item !== parent) item.classList.remove('open');
+        });
+
+        if (wasOpen) {
+          parent.classList.remove('open');
+        } else {
+          parent.classList.add('open');
+        }
+      });
+    });
+
+    // Close open dropdowns & mobile drawer when clicking outside or pressing Escape
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.nav-item-dropdown')) {
+        document.querySelectorAll('.nav-item-dropdown.open').forEach(item => {
+          item.classList.remove('open');
+        });
+      }
+      if (window.innerWidth < 1024 && navMenu && navMenu.classList.contains('show')) {
+        if (!e.target.closest('#mainNavbar')) {
+          navMenu.classList.remove('show');
+          if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+          if (iconBurger && iconClose) {
+            iconBurger.style.display = 'block';
+            iconClose.style.display = 'none';
+          }
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.nav-item-dropdown.open').forEach(item => {
+          item.classList.remove('open');
+        });
+        if (navMenu && navMenu.classList.contains('show')) {
+          navMenu.classList.remove('show');
+          if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+          if (iconBurger && iconClose) {
+            iconBurger.style.display = 'block';
+            iconClose.style.display = 'none';
+          }
+        }
+      }
+    });
 
     // Double-submit prevention and loading feedback
     document.querySelectorAll('form').forEach(form => {

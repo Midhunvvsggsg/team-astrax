@@ -171,15 +171,18 @@ class Subscription(models.Model):
 
     @property
     def subtotal(self):
-        return sum((line.line_subtotal for line in self.lines.all()), Decimal('0.00'))
+        val = sum((line.line_subtotal for line in self.lines.all()), Decimal('0.00'))
+        return Decimal(str(val)).quantize(Decimal('0.01'))
 
     @property
     def total_tax(self):
-        return sum((line.line_tax_amount for line in self.lines.all()), Decimal('0.00'))
+        val = sum((line.line_tax_amount for line in self.lines.all()), Decimal('0.00'))
+        return Decimal(str(val)).quantize(Decimal('0.01'))
 
     @property
     def total_amount(self):
-        return (self.subtotal + self.total_tax).quantize(Decimal('0.01'))
+        val = Decimal(str(self.subtotal or '0.00')) + Decimal(str(self.total_tax or '0.00'))
+        return val.quantize(Decimal('0.01'))
 
     @property
     def is_expired(self):

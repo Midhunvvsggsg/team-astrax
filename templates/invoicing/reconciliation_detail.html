@@ -87,7 +87,7 @@
             <tr>
               <td><strong>#{{ r.row_number }}</strong></td>
               <td style="font-size: var(--font-size-xs);">{{ r.date }}</td>
-              <td><strong style="color: var(--color-primary);">${{ r.amount }}</strong></td>
+              <td><strong style="color: var(--color-primary);">{{ r.amount|currency }}</strong></td>
               <td>
                 <div style="font-weight: 600;">{{ r.reference|default:"(No Reference)" }}</div>
                 <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ r.description }}</div>
@@ -98,7 +98,7 @@
                     {{ r.matched_invoice.invoice_number }}
                   </a>
                   <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                    Due: ${{ r.matched_invoice.amount_due }}
+                    Due: {{ r.matched_invoice.amount_due|currency }}
                   </div>
                 {% else %}
                   —
@@ -113,8 +113,8 @@
               <td style="text-align: right; white-space: nowrap;">
                 <form action="{% url 'invoicing:reconciliation_row_approve' row_pk=r.pk %}" method="post" style="display: inline;">
                   {% csrf_token %}
-                  <button type="submit" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.75rem; background: #16a34a; border-color: #16a34a;" onclick="return confirm('Approve row #{{ r.row_number }} and record ${{ r.amount }} payment for {{ r.matched_invoice.invoice_number }}?');">
-                    ✓ Approve &amp; Reconcile
+                  <button type="submit" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.75rem; background: #16a34a; border-color: #16a34a;" onclick="return confirm('Approve row #{{ r.row_number }} and record {{ r.amount|currency }} payment for {{ r.matched_invoice.invoice_number }}?');">
+                    Approve &amp; Reconcile
                   </button>
                 </form>
               </td>
@@ -160,7 +160,7 @@
             <tr>
               <td><strong>#{{ r.row_number }}</strong></td>
               <td style="font-size: var(--font-size-xs);">{{ r.date }}</td>
-              <td><strong style="color: var(--color-primary);">${{ r.amount }}</strong></td>
+              <td><strong style="color: var(--color-primary);">{{ r.amount|currency }}</strong></td>
               <td>
                 <div style="font-weight: 600;">{{ r.reference|default:"(No Reference)" }}</div>
                 <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ r.description }}</div>
@@ -175,7 +175,7 @@
                     <option value="">-- Choose Unpaid Invoice --</option>
                     {% for inv in unpaid_invoices %}
                       <option value="{{ inv.id }}">
-                        {{ inv.invoice_number }} - {{ inv.customer.email }} (Due: ${{ inv.amount_due }})
+                        {{ inv.invoice_number }} - {{ inv.customer.email }} (Due: {{ inv.amount_due|currency }})
                       </option>
                     {% endfor %}
                   </select>
@@ -191,7 +191,7 @@
     </div>
   {% else %}
     <div class="empty-state" style="padding: var(--space-20);">
-      <p style="color: var(--color-text-muted); margin: 0;">✓ Zero unmatched rows remaining.</p>
+      <p style="color: var(--color-text-muted); margin: 0;">Zero unmatched rows remaining.</p>
     </div>
   {% endif %}
 </div>
@@ -199,7 +199,7 @@
 <!-- Section 3: Auto-Reconciled & Manually Reconciled Rows -->
 <div class="card" style="margin-bottom: var(--space-32);">
   <div style="margin-bottom: var(--space-16);">
-    <h2 class="card-title">✓ Successfully Reconciled Rows</h2>
+    <h2 class="card-title">Successfully Reconciled Rows</h2>
     <p class="card-subtitle">Transactions auto-matched or approved with recorded payments</p>
   </div>
 
@@ -224,7 +224,7 @@
               <td>#{{ r.row_number }}</td>
               <td><span class="badge badge-active">Auto-Reconciled</span></td>
               <td style="font-size: var(--font-size-xs);">{{ r.date }}</td>
-              <td><strong>${{ r.amount }}</strong></td>
+              <td><strong>{{ r.amount|currency }}</strong></td>
               <td>
                 <div style="font-size: var(--font-size-xs); font-weight: 600;">{{ r.reference }}</div>
                 <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ r.description }}</div>
@@ -247,7 +247,7 @@
               <td>#{{ r.row_number }}</td>
               <td><span class="badge" style="background: #e0f2fe; color: #0369a1;">Reviewed &amp; Approved</span></td>
               <td style="font-size: var(--font-size-xs);">{{ r.date }}</td>
-              <td><strong>${{ r.amount }}</strong></td>
+              <td><strong>{{ r.amount|currency }}</strong></td>
               <td>
                 <div style="font-size: var(--font-size-xs); font-weight: 600;">{{ r.reference }}</div>
                 <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ r.description }}</div>
@@ -298,7 +298,7 @@
             <tr>
               <td>#{{ r.row_number }}</td>
               <td style="font-size: var(--font-size-xs);">{{ r.date }}</td>
-              <td>${{ r.amount }}</td>
+              <td>{{ r.amount|currency }}</td>
               <td style="font-size: var(--font-size-xs);">{{ r.reference }}</td>
               <td style="font-size: var(--font-size-xs); color: #64748b;">
                 {{ r.match_reasons }}

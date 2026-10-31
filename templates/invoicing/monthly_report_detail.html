@@ -30,7 +30,7 @@
 
   <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
     <a href="{% url 'invoicing:report_csv' pk=report.pk %}" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
-      📥 Download CSV
+      Download CSV
     </a>
     <a href="{% url 'invoicing:report_list' %}" class="btn btn-secondary">
       ← Back to Reports
@@ -41,10 +41,10 @@
 <!-- Section 1: Core Subscription & Revenue KPIs -->
 <div class="card" style="margin-bottom: var(--space-24);">
   <h2 class="card-title" style="margin-bottom: var(--space-16);">Subscriptions & Revenue Metrics</h2>
-  <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-16);">
-    <div class="stat-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
+  <div class="kpi-grid">
+    <div class="card kpi-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600; text-transform: uppercase;">Active Subscriptions</div>
-      <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text-main); margin-top: 4px;">
+      <div class="kpi-value" style="color: var(--color-text-main);">
         {{ report.active_subscriptions }}
       </div>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px;">
@@ -52,9 +52,9 @@
       </div>
     </div>
 
-    <div class="stat-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600; text-transform: uppercase;">Subscription Activity</div>
-      <div style="font-size: var(--font-size-2xl); font-weight: 700; color: #16a34a; margin-top: 4px;">
+      <div class="kpi-value" style="color: #16a34a;">
         +{{ report.new_subscriptions }} <span style="font-size: var(--font-size-base); color: #dc2626; font-weight: 500;">/ -{{ report.closed_subscriptions }}</span>
       </div>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px;">
@@ -62,30 +62,30 @@
       </div>
     </div>
 
-    <div class="stat-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600; text-transform: uppercase;">Monthly Recurring Revenue (MRR)</div>
-      <div style="font-size: var(--font-size-2xl); font-weight: 700; color: #2563eb; margin-top: 4px;">
-        ${{ report.mrr }}
+      <div class="kpi-value" style="color: #2563eb;">
+        {{ report.mrr|currency:"compact" }}
       </div>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px;">
         Normalized monthly recurring run-rate
       </div>
     </div>
 
-    <div class="stat-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600; text-transform: uppercase;">Revenue Received</div>
-      <div style="font-size: var(--font-size-2xl); font-weight: 700; color: #16a34a; margin-top: 4px;">
-        ${{ report.revenue_received }}
+      <div class="kpi-value" style="color: #16a34a;">
+        {{ report.revenue_received|currency:"compact" }}
       </div>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px;">
         Total cash collected during {{ report.month_name }}
       </div>
     </div>
 
-    <div class="stat-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #f8fafc; padding: var(--space-16); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600; text-transform: uppercase;">Amount Still Owed</div>
-      <div style="font-size: var(--font-size-2xl); font-weight: 700; color: #d97706; margin-top: 4px;">
-        ${{ report.amount_still_owed }}
+      <div class="kpi-value" style="color: #d97706;">
+        {{ report.amount_still_owed|currency:"compact" }}
       </div>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px;">
         Unpaid invoices issued up to period end
@@ -102,7 +102,7 @@
       <p class="card-subtitle">Breakdown of outstanding confirmed invoices past due as of the period close</p>
     </div>
     <span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: var(--font-size-sm); padding: 4px 10px;">
-      Total Overdue: ${{ report.total_overdue_amount }} ({{ report.total_overdue_count }} invoices)
+      Total Overdue: {{ report.total_overdue_amount|currency }} ({{ report.total_overdue_count }} invoices)
     </span>
   </div>
 
@@ -113,7 +113,7 @@
           <th>Aging Bucket</th>
           <th>Definition</th>
           <th>Invoice Count</th>
-          <th>Outstanding Debt ($)</th>
+          <th>Outstanding Debt</th>
           <th>Share of Overdue</th>
         </tr>
       </thead>
@@ -122,7 +122,7 @@
           <td><strong style="color: #d97706;">1 - 30 Days Overdue</strong></td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Due date between 1 and 30 days prior</td>
           <td>{{ report.overdue_1_30_count }}</td>
-          <td style="font-weight: 700; color: #d97706;">${{ report.overdue_1_30_amount }}</td>
+          <td style="font-weight: 700; color: #d97706;">{{ report.overdue_1_30_amount|currency }}</td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
             {% if report.total_overdue_amount > 0 %}Recent arrears{% else %}-{% endif %}
           </td>
@@ -131,7 +131,7 @@
           <td><strong style="color: #ea580c;">31 - 60 Days Overdue</strong></td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Due date between 31 and 60 days prior</td>
           <td>{{ report.overdue_31_60_count }}</td>
-          <td style="font-weight: 700; color: #ea580c;">${{ report.overdue_31_60_amount }}</td>
+          <td style="font-weight: 700; color: #ea580c;">{{ report.overdue_31_60_amount|currency }}</td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
             {% if report.total_overdue_amount > 0 %}Critical arrears{% else %}-{% endif %}
           </td>
@@ -140,7 +140,7 @@
           <td><strong style="color: #dc2626;">60+ Days Overdue</strong></td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Due date over 60 days prior</td>
           <td>{{ report.overdue_60_plus_count }}</td>
-          <td style="font-weight: 700; color: #dc2626;">${{ report.overdue_60_plus_amount }}</td>
+          <td style="font-weight: 700; color: #dc2626;">{{ report.overdue_60_plus_amount|currency }}</td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
             {% if report.total_overdue_amount > 0 %}Default risk{% else %}-{% endif %}
           </td>
@@ -149,7 +149,7 @@
           <td>Total Overdue Receivables</td>
           <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Sum across all aging categories</td>
           <td>{{ report.total_overdue_count }}</td>
-          <td style="color: #dc2626;">${{ report.total_overdue_amount }}</td>
+          <td style="color: #dc2626;">{{ report.total_overdue_amount|currency }}</td>
           <td>100%</td>
         </tr>
       </tbody>
@@ -175,7 +175,7 @@
             <th style="width: 60px;">Rank</th>
             <th>Customer Name</th>
             <th>Email</th>
-            <th style="text-align: right;">Total Paid ($)</th>
+            <th style="text-align: right;">Total Paid</th>
           </tr>
         </thead>
         <tbody>
@@ -188,7 +188,7 @@
               </td>
               <td><strong>{{ c.name }}</strong></td>
               <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">{{ c.email }}</td>
-              <td style="text-align: right; font-weight: 700; color: #16a34a;">${{ c.total_paid }}</td>
+              <td style="text-align: right; font-weight: 700; color: #16a34a;">{{ c.total_paid|currency }}</td>
             </tr>
           {% endfor %}
         </tbody>

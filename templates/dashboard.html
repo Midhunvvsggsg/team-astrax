@@ -17,24 +17,24 @@
     </div>
     <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
       <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary">
-        ⚠️ Overdue ({{ overdue_invoice_count }})
+        Overdue ({{ overdue_invoice_count }})
       </a>
       <a href="{% url 'invoicing:payment_list' %}" class="btn btn-secondary">
-        💳 All Payments
+        All Payments
       </a>
       <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">
-        🧾 Invoices
+        Invoices
       </a>
       {% if user.is_admin %}
         <a href="{% url 'staff_management' %}" class="btn btn-secondary">
-          👥 Staff
+          Staff
         </a>
       {% endif %}
     </div>
   </div>
 
   <!-- Filter Toolbar -->
-  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--color-border); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-20); padding-top: var(--space-16); border-top: 1px solid var(--color-border);">
     <div style="display: flex; align-items: center; gap: var(--space-4);">
       <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">From:</label>
       <input type="date" name="start_date" value="{{ start_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
@@ -74,28 +74,28 @@
   </form>
 </div>
 
-<!-- 5 Top Metric Cards Grid -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-16); margin-bottom: var(--space-24);">
+<!-- 5 Top Metric Cards Grid: repeat(auto-fit, minmax(220px, 1fr)) fluid typography -->
+<div class="kpi-grid">
   <!-- Card 1: Active Subscriptions -->
-  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-primary);">
+  <div class="card kpi-card" style="padding: var(--space-16); border-left: 4px solid var(--color-primary);">
     <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
       Active Subscriptions
     </div>
-    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-text); margin-top: var(--space-4);" id="metric-active-subs">
+    <div class="kpi-value" style="color: var(--color-text);" id="metric-active-subs">
       {{ active_subscriptions_count }}
     </div>
     <div style="font-size: 0.75rem; color: var(--color-success); margin-top: var(--space-4); font-weight: 600;">
-      ● Currently generating recurring billing
+      Active recurring subscriptions
     </div>
   </div>
 
   <!-- Card 2: Revenue Received -->
-  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-success);">
+  <div class="card kpi-card" style="padding: var(--space-16); border-left: 4px solid var(--color-success);">
     <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
       Revenue Received
     </div>
-    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-success); margin-top: var(--space-4);" id="metric-revenue-received">
-      ${{ revenue_received }}
+    <div class="kpi-value" style="color: var(--color-success);" id="metric-revenue-received">
+      {{ revenue_received|currency:"compact" }}
     </div>
     <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
       Reconciled payments collected
@@ -103,12 +103,12 @@
   </div>
 
   <!-- Card 3: Amount Still Owed -->
-  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-warning);">
+  <div class="card kpi-card" style="padding: var(--space-16); border-left: 4px solid var(--color-warning);">
     <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
       Amount Still Owed
     </div>
-    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-warning); margin-top: var(--space-4);" id="metric-amount-owed">
-      ${{ amount_still_owed }}
+    <div class="kpi-value" style="color: var(--color-warning);" id="metric-amount-owed">
+      {{ amount_still_owed|currency:"compact" }}
     </div>
     <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
       Uncollected balance on open invoices
@@ -116,30 +116,30 @@
   </div>
 
   <!-- Card 4: Overdue Invoices -->
-  <div class="card" style="padding: var(--space-16); border-left: 4px solid var(--color-danger);">
+  <div class="card kpi-card" style="padding: var(--space-16); border-left: 4px solid var(--color-danger);">
     <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
       Overdue Invoices
     </div>
-    <div style="font-size: 1.85rem; font-weight: 800; color: var(--color-danger); margin-top: var(--space-4);" id="metric-overdue-count">
+    <div class="kpi-value" style="color: var(--color-danger);" id="metric-overdue-count">
       {{ overdue_invoice_count }}
     </div>
     <div style="font-size: 0.75rem; color: var(--color-danger); margin-top: var(--space-4); font-weight: 600;">
       <a href="{% url 'invoicing:overdue_list' %}" style="color: inherit; text-decoration: underline;">
-        Requires collections follow-up →
+        Collections follow-up →
       </a>
     </div>
   </div>
 
   <!-- Card 5: Monthly Recurring Revenue (MRR) -->
-  <div class="card" style="padding: var(--space-16); border-left: 4px solid #8b5cf6;">
+  <div class="card kpi-card" style="padding: var(--space-16); border-left: 4px solid #8b5cf6;">
     <div style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0.05em;">
       Monthly Recurring Revenue
     </div>
-    <div style="font-size: 1.85rem; font-weight: 800; color: #8b5cf6; margin-top: var(--space-4);" id="metric-mrr">
-      ${{ monthly_recurring_revenue }}
+    <div class="kpi-value" style="color: #8b5cf6;" id="metric-mrr">
+      {{ monthly_recurring_revenue|currency:"compact" }}
     </div>
     <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: var(--space-4);">
-      Normalized active subscription run-rate
+      Normalized subscription run-rate
     </div>
   </div>
 </div>
@@ -147,23 +147,23 @@
 <!-- Charts Row (Loaded Locally, NO CDN, 100% Offline) -->
 <div class="grid-2" style="margin-bottom: var(--space-24);">
   <!-- Chart 1: Revenue by Month -->
-  <div class="card">
+  <div class="card" style="min-width: 0; overflow: hidden;">
     <div class="card-header">
       <h2 class="card-title">Monthly Revenue Collection</h2>
       <p class="card-subtitle">Historical cash receipts grouped by payment month</p>
     </div>
-    <div style="position: relative; height: 260px; width: 100%;">
+    <div class="chart-container">
       <canvas id="revenueChart"></canvas>
     </div>
   </div>
 
   <!-- Chart 2: Active Subscriptions by Plan -->
-  <div class="card">
+  <div class="card" style="min-width: 0; overflow: hidden;">
     <div class="card-header">
       <h2 class="card-title">Active Subscriptions by Plan</h2>
       <p class="card-subtitle">Plan tier distribution across active subscriber base</p>
     </div>
-    <div style="position: relative; height: 260px; width: 100%;">
+    <div class="chart-container">
       <canvas id="planChart"></canvas>
     </div>
   </div>
@@ -172,8 +172,8 @@
 <!-- Operational Tables Row: Overdue Invoices & Recent Payments -->
 <div class="grid-2">
   <!-- Table 1: Overdue Invoices -->
-  <div class="card" style="padding: 0; overflow: hidden;">
-    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+  <div class="card" style="padding: 0; overflow: hidden; min-width: 0;">
+    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-8);">
       <div>
         <h3 style="font-size: var(--font-size-base); font-weight: 700;">Overdue Invoices</h3>
         <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Due date passed & unpaid balance</p>
@@ -184,7 +184,7 @@
     </div>
 
     {% if overdue_page_obj %}
-      <div class="table-container" style="border: none;">
+      <div class="table-container" style="border: none; margin-bottom: 0;">
         <table class="table" style="font-size: 0.8rem;">
           <thead>
             <tr>
@@ -212,7 +212,7 @@
                   </span>
                 </td>
                 <td>
-                  <strong style="color: var(--color-danger);">${{ inv.amount_due }}</strong>
+                  <strong style="color: var(--color-danger);">{{ inv.amount_due|currency }}</strong>
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
                   <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.7rem;">
@@ -240,14 +240,14 @@
       {% endif %}
     {% else %}
       <div style="padding: var(--space-32); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
-        ✓ No overdue invoices. All accounts in good standing.
+        No overdue invoices. All accounts in good standing.
       </div>
     {% endif %}
   </div>
 
   <!-- Table 2: Recent Payments -->
-  <div class="card" style="padding: 0; overflow: hidden;">
-    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+  <div class="card" style="padding: 0; overflow: hidden; min-width: 0;">
+    <div style="padding: var(--space-16); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-8);">
       <div>
         <h3 style="font-size: var(--font-size-base); font-weight: 700;">Recent Payments</h3>
         <p style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Latest cash collections recorded</p>
@@ -258,7 +258,7 @@
     </div>
 
     {% if payments_page_obj %}
-      <div class="table-container" style="border: none;">
+      <div class="table-container" style="border: none; margin-bottom: 0;">
         <table class="table" style="font-size: 0.8rem;">
           <thead>
             <tr>
@@ -289,7 +289,7 @@
                   </span>
                 </td>
                 <td>
-                  <strong style="color: var(--color-success); font-size: 0.85rem;">+${{ p.amount }}</strong>
+                  <strong style="color: var(--color-success); font-size: 0.85rem;">+{{ p.amount|currency }}</strong>
                 </td>
               </tr>
             {% endfor %}
@@ -389,7 +389,13 @@
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { boxWidth: 12, font: { size: 11 } }
+              align: 'center',
+              labels: {
+                boxWidth: 12,
+                padding: 10,
+                font: { size: 11 },
+                usePointStyle: true
+              }
             }
           }
         }

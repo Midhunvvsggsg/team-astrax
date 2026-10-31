@@ -16,7 +16,7 @@
   </div>
 
   <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-24);">
     <div style="flex: 1; min-width: 220px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search discount rules by name...">
     </div>
@@ -68,7 +68,7 @@
               </td>
               <td>
                 <strong style="color: var(--color-success);">
-                  {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-${{ discount.value }} OFF{% endif %}
+                  {% if discount.discount_type == 'percentage' %}{{ discount.value }}% OFF{% else %}-{{ discount.value|currency }} OFF{% endif %}
                 </strong>
               </td>
               <td>
@@ -81,7 +81,7 @@
                 {% endif %}
               </td>
               <td style="font-size: var(--font-size-xs);">
-                <div>Min: ${{ discount.min_purchase_amount }}</div>
+                <div>Min: {{ discount.min_purchase_amount|currency }}</div>
                 {% if discount.min_quantity > 0 %}
                   <div style="color: var(--color-text-muted);">Min Qty: {{ discount.min_quantity }}</div>
                 {% endif %}

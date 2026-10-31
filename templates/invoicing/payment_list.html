@@ -27,12 +27,14 @@
       </p>
     </div>
     {% if not user.is_customer %}
-      <div style="display: flex; gap: var(--space-8); align-items: center;">
+      <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
         <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">
-          🧾 Invoices
+          <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Invoices
         </a>
         <a href="{% url 'invoicing:overdue_list' %}" class="btn btn-secondary">
-          ⚠️ Overdue List
+          <svg class="svg-icon svg-icon-stroke" viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          Overdue List
         </a>
       </div>
     {% endif %}
@@ -45,7 +47,7 @@
         Total Settled Volume
       </span>
       <div style="font-size: var(--font-size-xl); font-weight: 800; color: var(--color-success);">
-        ${{ total_amount }}
+        {{ total_amount|currency }}
       </div>
     </div>
     <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
@@ -54,7 +56,7 @@
   </div>
 
   <!-- Search & Filter Form -->
-  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-20); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-20);">
     <div style="flex: 1; min-width: 220px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search invoice #, customer email, note...">
     </div>
@@ -125,7 +127,7 @@
               </td>
               <td>
                 <strong style="color: var(--color-success); font-size: var(--font-size-base);">
-                  +${{ p.amount }}
+                  +{{ p.amount|currency }}
                 </strong>
               </td>
               <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">

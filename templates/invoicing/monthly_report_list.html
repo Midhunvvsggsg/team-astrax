@@ -31,7 +31,7 @@
         The daily automation engine compiles the previous month's financial metrics on the <strong>1st of each month at 00:00 UTC</strong> and dispatches an email summary to admins. Each period report is stored in <code>MonthlyReport</code> and preserved idempotently.
       </p>
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-        ⏱️ Current Simulated/System Date: <strong>{{ today|date:"Y-m-d" }}</strong>
+        Current Date: <strong>{{ today|date:"Y-m-d" }}</strong>
       </div>
     </div>
 
@@ -60,7 +60,7 @@
         </select>
       </div>
       <button type="submit" class="btn btn-primary" style="height: 34px; padding: 0 16px; font-size: var(--font-size-sm); display: flex; align-items: center; gap: 6px;">
-        ⚡ Generate Now
+        Generate Now
       </button>
     </form>
   </div>
@@ -86,48 +86,48 @@
         View Full Report →
       </a>
       <a href="{% url 'invoicing:report_csv' pk=latest_report.pk %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8125rem;">
-        📥 Download CSV
+        Download CSV
       </a>
     </div>
   </div>
 
-  <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-12);">
-    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+  <div class="kpi-grid">
+    <div class="card kpi-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">ACTIVE SUBS</div>
-      <div style="font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text-main); margin-top: 2px;">
+      <div class="kpi-value" style="color: var(--color-text-main);">
         {{ latest_report.active_subscriptions }}
       </div>
       <div style="font-size: 11px; color: var(--color-text-muted);">+{{ latest_report.new_subscriptions }} new / -{{ latest_report.closed_subscriptions }} closed</div>
     </div>
 
-    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">MRR</div>
-      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #2563eb; margin-top: 2px;">
-        ${{ latest_report.mrr }}
+      <div class="kpi-value" style="color: #2563eb;">
+        {{ latest_report.mrr|currency:"compact" }}
       </div>
       <div style="font-size: 11px; color: var(--color-text-muted);">Recurring revenue pace</div>
     </div>
 
-    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">REVENUE RECEIVED</div>
-      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #16a34a; margin-top: 2px;">
-        ${{ latest_report.revenue_received }}
+      <div class="kpi-value" style="color: #16a34a;">
+        {{ latest_report.revenue_received|currency:"compact" }}
       </div>
       <div style="font-size: 11px; color: var(--color-text-muted);">Collected in period</div>
     </div>
 
-    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">AMOUNT OWED</div>
-      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #d97706; margin-top: 2px;">
-        ${{ latest_report.amount_still_owed }}
+      <div class="kpi-value" style="color: #d97706;">
+        {{ latest_report.amount_still_owed|currency:"compact" }}
       </div>
       <div style="font-size: 11px; color: var(--color-text-muted);">Unpaid issued invoices</div>
     </div>
 
-    <div class="stat-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
+    <div class="card kpi-card" style="background: #fff; padding: var(--space-12); border-radius: 6px; border: 1px solid var(--color-border);">
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">TOTAL OVERDUE</div>
-      <div style="font-size: var(--font-size-xl); font-weight: 700; color: #dc2626; margin-top: 2px;">
-        ${{ latest_report.total_overdue_amount }}
+      <div class="kpi-value" style="color: #dc2626;">
+        {{ latest_report.total_overdue_amount|currency:"compact" }}
       </div>
       <div style="font-size: 11px; color: var(--color-text-muted);">{{ latest_report.total_overdue_count }} overdue invoices</div>
     </div>
@@ -173,13 +173,13 @@
                 {{ r.period_start }} to {{ r.period_end }}
               </td>
               <td>{{ r.active_subscriptions }}</td>
-              <td style="font-weight: 600; color: #2563eb;">${{ r.mrr }}</td>
-              <td style="font-weight: 600; color: #16a34a;">${{ r.revenue_received }}</td>
-              <td style="color: #d97706;">${{ r.amount_still_owed }}</td>
+              <td style="font-weight: 600; color: #2563eb;">{{ r.mrr|currency }}</td>
+              <td style="font-weight: 600; color: #16a34a;">{{ r.revenue_received|currency }}</td>
+              <td style="color: #d97706;">{{ r.amount_still_owed|currency }}</td>
               <td>
                 {% if r.total_overdue_count > 0 %}
                   <span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 600;">
-                    ${{ r.total_overdue_amount }} ({{ r.total_overdue_count }})
+                    {{ r.total_overdue_amount|currency }} ({{ r.total_overdue_count }})
                   </span>
                 {% else %}
                   <span style="color: #16a34a; font-size: var(--font-size-xs); font-weight: 600;">$0.00</span>
@@ -193,7 +193,7 @@
                   View
                 </a>
                 <a href="{% url 'invoicing:report_csv' pk=r.pk %}" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;">
-                  📥 CSV
+                  CSV
                 </a>
               </td>
             </tr>

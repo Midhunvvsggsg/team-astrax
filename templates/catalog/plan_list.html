@@ -16,7 +16,7 @@
   </div>
 
   <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+  <form method="get" class="filter-toolbar" style="margin-top: var(--space-24);">
     <div style="flex: 1; min-width: 220px;">
       <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search plans by name...">
     </div>
@@ -62,7 +62,7 @@
             <tr>
               <td><strong>{{ plan.name }}</strong></td>
               <td>
-                <strong style="color: var(--color-primary);">${{ plan.price }}</strong>
+                <strong style="color: var(--color-primary);">{{ plan.price|currency }}</strong>
                 <span style="color: var(--color-text-muted); font-size: var(--font-size-xs);"> / {{ plan.get_billing_period_display }}</span>
               </td>
               <td>{{ plan.minimum_quantity }} seat{{ plan.minimum_quantity|pluralize }}</td>
