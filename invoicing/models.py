@@ -73,6 +73,7 @@ class Invoice(models.Model):
         default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
     )
+    sent_at = models.DateTimeField(_('sent at'), null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -122,6 +123,17 @@ class Invoice(models.Model):
             return False
         return date.today() > self.due_date
 
+    @property
+    def amount_paid(self):
+        """Total payments recorded against this invoice."""
+        payments = self.payments.all()
+        return sum((p.amount for p in payments), Decimal('0.00')).quantize(Decimal('0.01'))
+
+    @property
+    def amount_due(self):
+        """Remaining balance unpaid on this invoice."""
+        return max(Decimal('0.00'), self.grand_total - self.amount_paid).quantize(Decimal('0.01'))
+
     def can_transition_to(self, new_status):
         """Validates status progression: Draft > Confirmed > Paid (plus Cancelled)."""
         curr = self.status
@@ -130,15 +142,15 @@ class Invoice(models.Model):
         if curr == self.Status.DRAFT:
             if new_status in [self.Status.CONFIRMED, self.Status.CANCELLED]:
                 return True, ""
-            return False, _(f"Draft invoice must be Confirmed before being marked Paid.")
+            return False, _("Draft invoice must be Confirmed before being marked Paid.")
         elif curr == self.Status.CONFIRMED:
             if new_status in [self.Status.PAID, self.Status.CANCELLED]:
                 return True, ""
-            return False, _(f"Confirmed invoice can only transition to Paid or Cancelled.")
+            return False, _("Confirmed invoice can only transition to Paid or Cancelled.")
         elif curr == self.Status.PAID:
-            return False, _("Paid invoice cannot be modified or cancelled.")
+            return False, _("A Paid invoice cannot be cancelled or reopened.")
         elif curr == self.Status.CANCELLED:
-            return False, _("Cancelled invoice cannot be reopened.")
+            return False, _("A Cancelled invoice cannot be reopened.")
         return False, _("Invalid transition.")
 
     def transition_to(self, new_status):
@@ -196,3 +208,45 @@ class InvoiceLine(models.Model):
     @property
     def line_subtotal(self):
         return (Decimal(self.quantity) * self.unit_price).quantize(Decimal('0.01'))
+
+
+class Payment(models.Model):
+    class Method(models.TextChoices):
+        BANK_TRANSFER = 'bank_transfer', _('Bank Transfer')
+        CREDIT_CARD = 'credit_card', _('Credit Card')
+        CASH = 'cash', _('Cash')
+        CHECK = 'check', _('Check')
+        OTHER = 'other', _('Other')
+
+    invoice = models.ForeignKey(Invoice, related_name='payments', on_delete=models.CASCADE)
+    amount = models.DecimalField(
+        _('amount ($)'),
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    payment_date = models.DateField(_('payment date'), default=timezone.now)
+    payment_method = models.CharField(
+        _('payment method'),
+        max_length=50,
+        choices=Method.choices,
+        default=Method.BANK_TRANSFER
+    )
+    note = models.TextField(_('notes'), blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recorded_payments'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('payment')
+        verbose_name_plural = _('payments')
+        ordering = ['-payment_date', '-created_at']
+
+    def __str__(self):
+        return f"Payment of ${self.amount} for {self.invoice.invoice_number} ({self.get_payment_method_display()})"
+

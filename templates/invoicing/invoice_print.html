@@ -110,6 +110,16 @@
           <span>Grand Total:</span>
           <span style="color: #4f46e5;">${{ invoice.grand_total }}</span>
         </div>
+        {% if invoice.amount_paid > 0 %}
+          <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.9rem; color: #16a34a;">
+            <span>Amount Paid:</span>
+            <span>${{ invoice.amount_paid }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 1rem; font-weight: 700; color: #dc2626;">
+            <span>Balance Due:</span>
+            <span>${{ invoice.amount_due }}</span>
+          </div>
+        {% endif %}
       </div>
     </div>
 
