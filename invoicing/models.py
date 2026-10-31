@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 class InvoiceQuerySet(models.QuerySet):
     def with_payment_totals(self):
         """Annotates SQL aggregate amount_paid and amount_due to prevent N+1 queries."""
-        from django.db.models import DecimalField, F, Sum, Value
+        from django.db.models import Case, DecimalField, F, Sum, Value, When
         from django.db.models.functions import Coalesce, Greatest
 
         return self.annotate(
@@ -22,9 +22,12 @@ class InvoiceQuerySet(models.QuerySet):
                 output_field=DecimalField(max_digits=12, decimal_places=2)
             )
         ).annotate(
-            annotated_amount_due=Greatest(
-                F('grand_total') - F('annotated_amount_paid'),
-                Value(Decimal('0.00')),
+            annotated_amount_due=Case(
+                When(status__in=['paid', 'cancelled'], then=Value(Decimal('0.00'))),
+                default=Greatest(
+                    F('grand_total') - F('annotated_amount_paid'),
+                    Value(Decimal('0.00')),
+                ),
                 output_field=DecimalField(max_digits=12, decimal_places=2)
             )
         ).order_by('-issue_date', '-id')
@@ -168,6 +171,8 @@ class Invoice(models.Model):
     @property
     def amount_due(self):
         """Remaining balance unpaid on this invoice via SQL aggregate."""
+        if self.status in [self.Status.PAID, self.Status.CANCELLED]:
+            return Decimal('0.00')
         if hasattr(self, 'annotated_amount_due'):
             return self.annotated_amount_due
         return max(Decimal('0.00'), self.grand_total - self.amount_paid).quantize(Decimal('0.01'))
@@ -182,7 +187,11 @@ class Invoice(models.Model):
                 return True, ""
             return False, _("Draft invoice must be Confirmed before being marked Paid.")
         elif curr == self.Status.CONFIRMED:
-            if new_status in [self.Status.PAID, self.Status.CANCELLED]:
+            if new_status == self.Status.CANCELLED:
+                if self.amount_paid > Decimal('0.00'):
+                    return False, _("Cannot cancel an invoice with recorded payments. Please refund or remove payments first.")
+                return True, ""
+            if new_status == self.Status.PAID:
                 return True, ""
             return False, _("Confirmed invoice can only transition to Paid or Cancelled.")
         elif curr == self.Status.PAID:

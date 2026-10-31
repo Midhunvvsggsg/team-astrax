@@ -299,6 +299,15 @@ def invoice_transition(request, pk):
     if request.method == 'POST':
         new_status = request.POST.get('new_status', '').strip()
         try:
+            if new_status == Invoice.Status.PAID and invoice.amount_due > Decimal('0.00'):
+                Payment.objects.create(
+                    invoice=invoice,
+                    amount=invoice.amount_due,
+                    date=date.today(),
+                    method=Payment.Method.BANK_TRANSFER,
+                    note=f"Full settlement payment recorded via 'Mark as Paid' by {request.user.email}",
+                    recorded_by=request.user,
+                )
             invoice.transition_to(new_status)
             messages.success(request, f"Invoice {invoice.invoice_number} status updated to {invoice.get_status_display()}.")
         except ValidationError as e:

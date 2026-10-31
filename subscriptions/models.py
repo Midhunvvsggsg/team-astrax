@@ -274,7 +274,12 @@ class Subscription(models.Model):
 
         # Paused -> Active, Closed
         if curr == self.Status.PAUSED:
-            if new_status in [self.Status.ACTIVE, self.Status.CLOSED]:
+            if new_status == self.Status.ACTIVE:
+                return True, ""
+            if new_status == self.Status.CLOSED:
+                if self.expiry_date and today < self.expiry_date:
+                    if not self.plan.closable_early:
+                        return False, _(f"Plan '{self.plan.name}' does not permit early closure before {self.expiry_date}.")
                 return True, ""
             return False, _("Paused subscription can only resume to Active or be Closed.")
 

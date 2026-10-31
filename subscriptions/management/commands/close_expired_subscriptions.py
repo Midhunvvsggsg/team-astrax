@@ -11,7 +11,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         today = date.today()
         expired_subs = Subscription.objects.filter(
-            status=Subscription.Status.ACTIVE,
+            status__in=[Subscription.Status.ACTIVE, Subscription.Status.PAUSED],
             plan__auto_close_on_end=True,
             expiry_date__lt=today,
         ).select_related('plan', 'customer')

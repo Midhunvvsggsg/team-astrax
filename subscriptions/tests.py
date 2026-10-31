@@ -728,3 +728,66 @@ class QueryCountAndSeedTests(TestCase):
         self.assertIn("Demo Seed Completed Successfully", output)
         self.assertGreaterEqual(Subscription.objects.count(), 5)
 
+
+class SubscriptionLifecycleEdgeCasesAndRegressionTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(
+            email='edge_sub@example.com',
+            password='CustomerPass@123',
+            role=User.Role.CUSTOMER
+        )
+        self.plan = Plan.objects.create(
+            name="Strict Plan",
+            price=Decimal('100.00'),
+            billing_period=Plan.BillingPeriod.MONTHLY,
+            closable_early=False,
+            pausable=True,
+            auto_close_on_end=True,
+        )
+
+    def test_paused_subscription_cannot_close_early_if_not_permitted(self):
+        """A paused subscription whose plan does not allow early closure must not close before expiry."""
+        sub = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            status=Subscription.Status.ACTIVE,
+            start_date=date.today(),
+            expiry_date=date.today() + timedelta(days=30),
+        )
+        # Pause
+        sub.transition_to(Subscription.Status.PAUSED)
+        self.assertEqual(sub.status, Subscription.Status.PAUSED)
+
+        # Attempt to close early while paused
+        with self.assertRaises(ValidationError) as ctx:
+            sub.transition_to(Subscription.Status.CLOSED)
+        self.assertIn("does not permit early closure", str(ctx.exception))
+
+    def test_auto_close_expired_command_closes_both_active_and_paused_subscriptions(self):
+        """Scheduled command must close both active and paused subscriptions when expiry is reached."""
+        past_date = date.today() - timedelta(days=5)
+        sub_active = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            status=Subscription.Status.ACTIVE,
+            start_date=date.today() - timedelta(days=35),
+            expiry_date=past_date,
+        )
+        sub_paused = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            status=Subscription.Status.PAUSED,
+            start_date=date.today() - timedelta(days=35),
+            expiry_date=past_date,
+        )
+
+        out = StringIO()
+        call_command('close_expired_subscriptions', stdout=out)
+        sub_active.refresh_from_db()
+        sub_paused.refresh_from_db()
+
+        self.assertEqual(sub_active.status, Subscription.Status.CLOSED)
+        self.assertEqual(sub_paused.status, Subscription.Status.CLOSED)
+        self.assertIn("Successfully closed 2 expired subscription(s)", out.getvalue())
+
+

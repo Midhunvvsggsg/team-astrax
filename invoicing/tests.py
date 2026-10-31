@@ -386,6 +386,56 @@ class InvoiceStatusTransitionTests(TestCase):
         res_bill = self.client.get(reverse('invoicing:run_billing'))
         self.assertEqual(res_bill.status_code, 405)
 
+    def test_cancelled_invoice_amount_due_is_zero(self):
+        """Cancelled invoice must always report zero amount due in Python property and SQL annotation."""
+        self.invoice.transition_to(Invoice.Status.CANCELLED)
+        self.assertEqual(self.invoice.amount_due, Decimal('0.00'))
+
+        annotated_inv = Invoice.objects.with_payment_totals().get(pk=self.invoice.pk)
+        self.assertEqual(annotated_inv.annotated_amount_due, Decimal('0.00'))
+
+    def test_cannot_cancel_confirmed_invoice_with_payments(self):
+        """Confirmed invoice with existing recorded payments cannot be cancelled."""
+        self.invoice.status = Invoice.Status.CONFIRMED
+        self.invoice.save()
+
+        Payment.objects.create(
+            invoice=self.invoice,
+            amount=Decimal('10.00'),
+            date=date.today(),
+            method=Payment.Method.CARD
+        )
+        self.invoice.refresh_from_db()
+        with self.assertRaises(ValidationError) as ctx:
+            self.invoice.transition_to(Invoice.Status.CANCELLED)
+        self.assertIn("Cannot cancel an invoice with recorded payments", str(ctx.exception))
+
+    def test_mark_as_paid_transition_creates_settlement_payment(self):
+        """Staff marking a confirmed invoice as Paid records a settlement payment for the balance."""
+        self.invoice.status = Invoice.Status.CONFIRMED
+        self.invoice.grand_total = Decimal('100.00')
+        self.invoice.save()
+
+        staff_user = User.objects.create_user(
+            email='cashier_staff@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.client.force_login(staff_user)
+
+        res = self.client.post(reverse('invoicing:invoice_transition', kwargs={'pk': self.invoice.pk}), {
+            'new_status': Invoice.Status.PAID
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PAID)
+        self.assertEqual(self.invoice.amount_paid, Decimal('100.00'))
+        self.assertEqual(self.invoice.amount_due, Decimal('0.00'))
+        self.assertEqual(self.invoice.payments.count(), 1)
+        self.assertEqual(self.invoice.payments.first().recorded_by, staff_user)
+
+
 
 
 class InvoiceSendAndPrintTests(TestCase):

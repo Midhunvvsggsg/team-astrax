@@ -126,7 +126,8 @@ def subscription_detail(request, pk):
                 available_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
         elif curr == Subscription.Status.PAUSED:
             available_actions.append(('active', 'Resume Subscription', 'btn-primary'))
-            available_actions.append(('closed', 'Close Subscription', 'btn-danger'))
+            if not subscription.expiry_date or today >= subscription.expiry_date or subscription.plan.closable_early:
+                available_actions.append(('closed', 'Close Subscription', 'btn-danger'))
         elif curr == Subscription.Status.CLOSED:
             if subscription.plan.renewable:
                 available_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
@@ -141,7 +142,8 @@ def subscription_detail(request, pk):
                 customer_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
         elif curr == Subscription.Status.PAUSED:
             customer_actions.append(('resume', 'Resume Subscription', 'btn-primary'))
-            customer_actions.append(('close', 'Close Subscription', 'btn-danger'))
+            if not subscription.expiry_date or today >= subscription.expiry_date or subscription.plan.closable_early:
+                customer_actions.append(('close', 'Close Subscription', 'btn-danger'))
         elif curr == Subscription.Status.CLOSED:
             if subscription.plan.renewable:
                 customer_actions.append(('renew', 'Renew Subscription', 'btn-primary'))
