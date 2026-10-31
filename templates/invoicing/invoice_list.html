@@ -8,7 +8,7 @@
     <div>
       <span class="badge badge-staff">Finance Operations</span>
       <h1 class="card-title" style="margin-top: var(--space-8);">Recurring Invoices</h1>
-      <p class="card-subtitle">Automated, idempotent recurring billing runs with taxes and applied discounts.</p>
+      <p class="card-subtitle">Automated, idempotent recurring billing runs with taxes, discounts, and payment tracking.</p>
     </div>
     <div style="display: flex; gap: var(--space-8); align-items: center;">
       <!-- Run Billing Form Button -->
@@ -23,9 +23,9 @@
   </div>
 
   <!-- Search & Filters -->
-  <form method="get" style="display: flex; gap: var(--space-16); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
+  <form method="get" style="display: flex; gap: var(--space-12); flex-wrap: wrap; margin-top: var(--space-24); align-items: center;">
     <div style="flex: 1; min-width: 220px;">
-      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by invoice #, customer email, sub #...">
+      <input type="text" name="q" value="{{ search_query }}" class="form-input" placeholder="Search by invoice #, customer, sub #...">
     </div>
     <div style="min-width: 140px;">
       <select name="status" class="form-select">
@@ -44,11 +44,19 @@
       </select>
     </div>
     <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">From:</label>
+      <input type="date" name="start_date" value="{{ start_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <label style="font-size: var(--font-size-xs); color: var(--color-text-muted); font-weight: 600;">To:</label>
+      <input type="date" name="end_date" value="{{ end_date }}" class="form-input" style="padding: 6px 10px; font-size: 0.8rem; width: 135px;">
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
       <input type="checkbox" name="overdue" value="yes" id="id_overdue" {% if overdue_filter == 'yes' %}checked{% endif %}>
       <label for="id_overdue" style="font-size: var(--font-size-xs); font-weight: 600; cursor: pointer;">Overdue Only</label>
     </div>
     <button type="submit" class="btn btn-secondary">Filter</button>
-    {% if search_query or status_filter or customer_filter or overdue_filter %}
+    {% if search_query or status_filter or customer_filter or overdue_filter or start_date or end_date %}
       <a href="{% url 'invoicing:invoice_list' %}" class="btn btn-secondary">Clear</a>
     {% endif %}
   </form>
@@ -63,7 +71,7 @@
             <th>Invoice #</th>
             <th>Customer</th>
             <th>Subscription</th>
-            <th>Billing Period</th>
+            <th>Period</th>
             <th>Due Date</th>
             <th>Subtotal</th>
             <th>Discount</th>
@@ -108,9 +116,17 @@
               <td style="font-size: var(--font-size-xs);">${{ inv.tax_total }}</td>
               <td>
                 <strong style="color: var(--color-primary); font-size: var(--font-size-base);">${{ inv.grand_total }}</strong>
+                {% if inv.amount_paid > 0 and inv.status != 'paid' %}
+                  <div style="font-size: 0.65rem; color: var(--color-success);">Paid: ${{ inv.amount_paid }}</div>
+                {% endif %}
               </td>
               <td>
-                <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
+                <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                  <span class="badge badge-inv-{{ inv.status }}">{{ inv.get_status_display }}</span>
+                  {% if inv.sent_at %}
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success); font-size: 0.65rem;" title="Sent on {{ inv.sent_at|date:'M d, Y H:i' }}">✉️ Sent</span>
+                  {% endif %}
+                </div>
               </td>
               <td style="text-align: right; white-space: nowrap;">
                 <a href="{% url 'invoicing:invoice_detail' pk=inv.pk %}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Manage</a>
@@ -126,13 +142,13 @@
   {% if page_obj.has_other_pages %}
     <div style="display: flex; justify-content: center; gap: var(--space-8); margin-top: var(--space-24);">
       {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}" class="btn btn-secondary">Previous</a>
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">Previous</a>
       {% endif %}
       <span class="btn btn-secondary" style="cursor: default; background: var(--color-surface-muted);">
         Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
       </span>
       {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}" class="btn btn-secondary">Next</a>
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&customer={{ customer_filter }}&overdue={{ overdue_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">Next</a>
       {% endif %}
     </div>
   {% endif %}
@@ -141,7 +157,7 @@
     <div class="empty-state-icon">🧾</div>
     <h3 class="empty-state-title">No Invoices Found</h3>
     <p class="empty-state-desc">
-      {% if search_query or status_filter or customer_filter or overdue_filter %}
+      {% if search_query or status_filter or customer_filter or overdue_filter or start_date or end_date %}
         No invoices match your selected filter criteria.
       {% else %}
         No recurring billing invoices generated yet. Click "Run Billing Engine" above to trigger automated invoicing for all active subscriptions.

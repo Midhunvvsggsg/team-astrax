@@ -3,25 +3,42 @@
 {% block title %}{{ invoice.invoice_number }} - Invoice Details{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: var(--space-16); display: flex; justify-content: space-between; align-items: center;">
-  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'invoicing:invoice_list' %}{% endif %}" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+<div style="margin-bottom: var(--space-16); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
+  <a href="{% if user.is_customer %}{% url 'customer_portal' %}{% else %}{% url 'invoicing:invoice_list' %}{% endif %}" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.85rem;">
     ← Back
   </a>
-  <a href="{% url 'invoicing:invoice_print' pk=invoice.pk %}" class="btn btn-secondary" target="_blank">
-    🖨️ Print / PDF View
-  </a>
+  <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
+    <a href="{% url 'invoicing:invoice_print' pk=invoice.pk %}" class="btn btn-secondary" target="_blank">
+      🖨️ Print / PDF
+    </a>
+
+    {% if not user.is_customer %}
+      <!-- Send Invoice Button -->
+      <form action="{% url 'invoicing:invoice_send' pk=invoice.pk %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary" title="Email invoice to customer">
+          ✉️ {% if invoice.sent_at %}Resend Email{% else %}Send Email{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
 </div>
 
 <!-- Header Card -->
 <div class="card" style="margin-bottom: var(--space-24);">
   <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-16);">
     <div>
-      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8);">
+      <div style="display: flex; align-items: center; gap: var(--space-8); margin-bottom: var(--space-8); flex-wrap: wrap;">
         <span class="badge badge-inv-{{ invoice.status }}" style="font-size: var(--font-size-sm); padding: var(--space-4) var(--space-16);">
           {{ invoice.get_status_display }}
         </span>
         {% if invoice.is_overdue %}
           <span class="badge badge-overdue">OVERDUE</span>
+        {% endif %}
+        {% if invoice.sent_at %}
+          <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: var(--color-success); border: 1px solid var(--color-success);">
+            ✉️ Sent on {{ invoice.sent_at|date:"M d, Y H:i" }}
+          </span>
         {% endif %}
       </div>
       <h1 class="card-title">{{ invoice.invoice_number }}</h1>
@@ -32,7 +49,7 @@
 
     <!-- Status Action Controls for Staff/Admin -->
     {% if not user.is_customer %}
-      <div style="display: flex; gap: var(--space-8); align-items: center;">
+      <div style="display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;">
         {% if invoice.status == 'draft' %}
           <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
             {% csrf_token %}
@@ -47,9 +64,22 @@
         {% elif invoice.status == 'confirmed' %}
           <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
             {% csrf_token %}
+            <input type="hidden" name="new_status" value="paid">
+            <button type="submit" class="btn btn-primary" style="background: var(--color-success); border-color: var(--color-success);" onclick="return confirm('Mark this confirmed invoice as fully Paid?')">Mark as Paid</button>
+          </form>
+          <form action="{% url 'invoicing:invoice_transition' pk=invoice.pk %}" method="post" style="display:inline;">
+            {% csrf_token %}
             <input type="hidden" name="new_status" value="cancelled">
             <button type="submit" class="btn btn-danger" onclick="return confirm('Cancel this confirmed invoice?')">Cancel Invoice</button>
           </form>
+        {% elif invoice.status == 'paid' %}
+          <span style="font-size: var(--font-size-sm); color: var(--color-success); font-weight: 600;">
+            ✓ Paid in Full
+          </span>
+        {% elif invoice.status == 'cancelled' %}
+          <span style="font-size: var(--font-size-sm); color: var(--color-danger); font-weight: 600;">
+            ✕ Cancelled
+          </span>
         {% endif %}
       </div>
     {% endif %}
@@ -88,7 +118,7 @@
 </div>
 
 <!-- Invoice Lines Card -->
-<div class="card">
+<div class="card" style="margin-bottom: var(--space-24);">
   <div class="card-header">
     <h2 class="card-title">Invoice Itemized Breakdown</h2>
     <p class="card-subtitle">Product and service charges calculated from subscription rules</p>
@@ -135,7 +165,7 @@
 
   <!-- Totals Summary -->
   <div style="display: flex; justify-content: flex-end; margin-top: var(--space-24);">
-    <div style="min-width: 300px; background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md);">
+    <div style="min-width: 320px; background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md);">
       <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-8); font-size: var(--font-size-sm);">
         <span style="color: var(--color-text-muted);">Subtotal:</span>
         <span>${{ invoice.subtotal }}</span>
@@ -152,7 +182,93 @@
         <span>Grand Total:</span>
         <span style="color: var(--color-primary);">${{ invoice.grand_total }}</span>
       </div>
+      <div style="display: flex; justify-content: space-between; margin-top: var(--space-8); font-size: var(--font-size-sm); color: var(--color-success); font-weight: 600;">
+        <span>Total Paid:</span>
+        <span>${{ invoice.amount_paid }}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: var(--space-4); font-size: var(--font-size-base); font-weight: 700; {% if invoice.amount_due > 0 %}color: var(--color-danger);{% else %}color: var(--color-success);{% endif %}">
+        <span>Balance Due:</span>
+        <span>${{ invoice.amount_due }}</span>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- Payments History & Payment Recording -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-12);">
+    <div>
+      <h2 class="card-title">Payments</h2>
+      <p class="card-subtitle">Transaction audit log and payment reconciliation for this invoice</p>
+    </div>
+    <div style="font-size: var(--font-size-sm);">
+      <strong>Balance Due:</strong>
+      <span style="font-weight: 800; {% if invoice.amount_due > 0 %}color: var(--color-danger);{% else %}color: var(--color-success);{% endif %}">
+        ${{ invoice.amount_due }}
+      </span>
+    </div>
+  </div>
+
+  {% if payments %}
+    <div class="table-container" style="margin-bottom: var(--space-24);">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Amount</th>
+            <th>Recorded By</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payments %}
+            <tr>
+              <td>{{ p.payment_date|date:"M d, Y" }}</td>
+              <td><span class="badge">{{ p.get_payment_method_display }}</span></td>
+              <td><strong style="color: var(--color-success);">${{ p.amount }}</strong></td>
+              <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                {{ p.recorded_by.email|default:"System" }}
+              </td>
+              <td style="font-size: var(--font-size-xs);">{{ p.note|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin-bottom: var(--space-20);">
+      No payments recorded yet for this invoice.
+    </p>
+  {% endif %}
+
+  <!-- Record Payment Form for Staff/Admin -->
+  {% if payment_form and invoice.amount_due > 0 %}
+    <div style="background: var(--color-surface-muted); padding: var(--space-16); border-radius: var(--radius-md); border-top: 2px solid var(--color-border);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-12);">Record Payment</h3>
+      <form action="{% url 'invoicing:payment_create' pk=invoice.pk %}" method="post" style="display: flex; gap: var(--space-12); flex-wrap: wrap; align-items: flex-end;">
+        {% csrf_token %}
+        <div>
+          <label class="form-label" style="font-size: var(--font-size-xs);">Amount ($) *</label>
+          {{ payment_form.amount }}
+        </div>
+        <div>
+          <label class="form-label" style="font-size: var(--font-size-xs);">Payment Date *</label>
+          {{ payment_form.payment_date }}
+        </div>
+        <div>
+          <label class="form-label" style="font-size: var(--font-size-xs);">Payment Method *</label>
+          {{ payment_form.payment_method }}
+        </div>
+        <div style="flex: 1; min-width: 180px;">
+          <label class="form-label" style="font-size: var(--font-size-xs);">Note</label>
+          {{ payment_form.note }}
+        </div>
+        <button type="submit" class="btn btn-primary" style="height: 38px;">
+          ✓ Record Payment
+        </button>
+      </form>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}
