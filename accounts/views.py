@@ -83,8 +83,8 @@ def logout_view(request):
 @customer_required
 def customer_portal_view(request):
     """Customer self-service portal (Customer role only)."""
-    subscriptions = request.user.subscriptions.select_related('plan').prefetch_related('lines').all()
-    invoices = request.user.invoices.select_related('subscription__plan').all()
+    subscriptions = request.user.subscriptions.select_related('plan').prefetch_related('lines__tax', 'lines__product', 'lines__variant').all()
+    invoices = request.user.invoices.select_related('subscription__plan').with_payment_totals().all()
     return render(request, 'accounts/customer_portal.html', {
         'customer': request.user,
         'subscriptions': subscriptions,

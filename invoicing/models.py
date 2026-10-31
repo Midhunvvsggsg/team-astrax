@@ -55,10 +55,10 @@ class Invoice(models.Model):
         related_name='invoices',
         db_index=True,
     )
-    period_start = models.DateField(_('billing period start'))
+    period_start = models.DateField(_('billing period start'), db_index=True)
     period_end = models.DateField(_('billing period end'))
-    issue_date = models.DateField(_('issue date'), default=timezone.now)
-    due_date = models.DateField(_('due date'))
+    issue_date = models.DateField(_('issue date'), default=timezone.now, db_index=True)
+    due_date = models.DateField(_('due date'), db_index=True)
     status = models.CharField(
         _('status'),
         max_length=20,

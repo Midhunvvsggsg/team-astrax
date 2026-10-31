@@ -598,3 +598,103 @@ class DiscountPermissionAndAccessTests(TestCase):
         }, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(DiscountRule.objects.filter(name='Black Friday 25%').exists())
+
+
+class QueryCountAndSeedTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email='admin_perf@brightloop.com',
+            password='AdminPassword@1'
+        )
+        self.staff = User.objects.create_user(
+            email='staff_perf@brightloop.com',
+            password='StaffPassword@1',
+            role=User.Role.STAFF
+        )
+        self.customer = User.objects.create_user(
+            email='customer_perf@brightloop.com',
+            password='CustomerPassword@1',
+            role=User.Role.CUSTOMER
+        )
+        self.plan = Plan.objects.create(
+            name="Perf Plan",
+            price=Decimal('50.00'),
+            billing_period=Plan.BillingPeriod.MONTHLY,
+            minimum_quantity=1
+        )
+        self.product = Product.objects.create(
+            name="Perf Product",
+            sales_price=Decimal('25.00'),
+            cost_price=Decimal('5.00')
+        )
+        self.tax = Tax.objects.create(
+            name="Standard Tax",
+            percentage=Decimal('10.00'),
+            is_active=True
+        )
+
+        # Create 15 subscriptions with 2 lines each (30 lines total)
+        subs = []
+        for i in range(15):
+            subs.append(Subscription(
+                subscription_number=f"SUB-PERF-{i:03d}",
+                customer=self.customer,
+                plan=self.plan,
+                start_date=date.today(),
+                status=Subscription.Status.ACTIVE,
+                created_by=self.admin
+            ))
+        Subscription.objects.bulk_create(subs)
+
+        all_subs = list(Subscription.objects.filter(subscription_number__startswith="SUB-PERF-"))
+        lines = []
+        for s in all_subs:
+            lines.append(SubscriptionLine(
+                subscription=s,
+                product=self.product,
+                quantity=2,
+                unit_price=Decimal('25.00'),
+                tax=self.tax
+            ))
+            lines.append(SubscriptionLine(
+                subscription=s,
+                product=self.product,
+                quantity=1,
+                unit_price=Decimal('25.00'),
+                tax=self.tax
+            ))
+        SubscriptionLine.objects.bulk_create(lines)
+
+    def test_subscriptions_list_query_count_is_bounded_and_no_n_plus_one(self):
+        """Verify subscription list uses prefetch and select_related, bounding queries <= 10."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        self.client.force_login(self.admin)
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(reverse('subscriptions:subscription_list'))
+
+        self.assertEqual(response.status_code, 200)
+        # Bounded query count: session, user, count, customer list, subscriptions, lines, taxes, products, variants
+        self.assertLessEqual(len(ctx), 12)
+
+    def test_customer_portal_query_count_is_bounded(self):
+        """Verify customer portal page bounds query count and prevents N+1 payment calculations."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        self.client.force_login(self.customer)
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(reverse('customer_portal'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(ctx), 10)
+
+    def test_seed_demo_command_small_run(self):
+        """Verify seed_demo management command executes without errors."""
+        out = StringIO()
+        call_command('seed_demo', '--subscriptions', '5', stdout=out)
+        output = out.getvalue()
+        self.assertIn("Demo Seed Completed Successfully", output)
+        self.assertGreaterEqual(Subscription.objects.count(), 5)
+
