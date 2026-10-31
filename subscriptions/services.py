@@ -111,8 +111,8 @@ def get_applicable_discounts(subscription: Subscription, billing_date: date = No
             if not matching_lines:
                 continue
 
-            eligible_quantity = sum(line.quantity for line in matching_lines)
-            eligible_amount = sum(line.line_subtotal for line in matching_lines)
+            eligible_quantity = sum((line.quantity for line in matching_lines), 0)
+            eligible_amount = sum((line.line_subtotal for line in matching_lines), Decimal('0.00'))
 
             # Minimum requirements
             if eligible_quantity < rule.min_quantity:

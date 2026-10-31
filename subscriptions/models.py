@@ -165,15 +165,15 @@ class Subscription(models.Model):
 
     @property
     def total_quantity(self):
-        return sum(line.quantity for line in self.lines.all())
+        return sum((line.quantity for line in self.lines.all()), 0)
 
     @property
     def subtotal(self):
-        return sum(line.line_subtotal for line in self.lines.all())
+        return sum((line.line_subtotal for line in self.lines.all()), Decimal('0.00'))
 
     @property
     def total_tax(self):
-        return sum(line.line_tax_amount for line in self.lines.all())
+        return sum((line.line_tax_amount for line in self.lines.all()), Decimal('0.00'))
 
     @property
     def total_amount(self):

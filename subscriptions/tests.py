@@ -824,5 +824,31 @@ class SubscriptionLifecycleEdgeCasesAndRegressionTests(TestCase):
         self.assertEqual(form.cleaned_data['min_purchase_amount'], Decimal('0.00'))
         self.assertEqual(form.cleaned_data['min_quantity'], 1)
 
+    def test_subscription_with_zero_lines_totals_and_list_rendering(self):
+        """Subscriptions with no lines must return Decimal('0.00') without raising AttributeError in template."""
+        staff = User.objects.create_user(
+            email='sub_staff_render@brightloop.com',
+            password='StaffPass@123',
+            role=User.Role.STAFF
+        )
+        empty_sub = Subscription.objects.create(
+            customer=self.customer,
+            plan=self.plan,
+            status=Subscription.Status.DRAFT,
+            start_date=date.today(),
+        )
+        self.assertEqual(empty_sub.total_quantity, 0)
+        self.assertEqual(empty_sub.subtotal, Decimal('0.00'))
+        self.assertEqual(empty_sub.total_tax, Decimal('0.00'))
+        self.assertEqual(empty_sub.total_amount, Decimal('0.00'))
+
+        # Must render cleanly on subscription list page without AttributeError: 'int' object has no attribute 'quantize'
+        self.client.force_login(staff)
+        response = self.client.get(reverse('subscriptions:subscription_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, empty_sub.subscription_number)
+        self.assertContains(response, "$0.00")
+
+
 
 
