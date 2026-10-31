@@ -232,8 +232,11 @@ python manage.py test
 Ran 160 tests in 69.139s - OK (160/160 passing)
 ```
 
+#Made using brains🧠
+
 ---
 
 ## 👥 Contributors
 - **Midhun** ([@Midhunvvsggsg](https://github.com/Midhunvvsggsg))
 - **arjunsagar-ai** ([@arjunsagar-ai](https://github.com/arjunsagar-ai))
+
