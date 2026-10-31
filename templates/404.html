@@ -3,14 +3,19 @@
 {% block title %}Page Not Found (404) - Brightloop{% endblock %}
 
 {% block content %}
-<div style="max-width: 500px; margin: 40px auto; text-align: center;">
-  <div class="card">
+<div style="max-width: 520px; margin: 40px auto; text-align: center;">
+  <div class="card" style="padding: var(--space-32) var(--space-24);">
     <div style="font-size: 3.5rem; margin-bottom: var(--space-8); color: var(--color-warning);">🔍</div>
-    <h1 class="card-title">404 - Page Not Found</h1>
-    <p class="card-subtitle" style="margin: var(--space-16) 0 var(--space-24);">
-      The page or resource you are looking for does not exist or has been moved.
+    <h1 class="card-title" style="margin-bottom: var(--space-8);">404 - Page Not Found</h1>
+    <p class="card-subtitle" style="margin: 0 auto var(--space-24); max-width: 420px; font-size: var(--font-size-base);">
+      The page, subscription, or invoice you are looking for does not exist, has been moved, or belongs to another account.
     </p>
-    <a href="{% url 'home' %}" class="btn btn-primary">Return to Homepage</a>
+    <div style="display: flex; justify-content: center; gap: var(--space-12); flex-wrap: wrap;">
+      <a href="{% url 'home' %}" class="btn btn-primary">Return to Homepage</a>
+      {% if user.is_customer %}
+        <a href="{% url 'customer_portal' %}" class="btn btn-secondary">My Customer Portal</a>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}
