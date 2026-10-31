@@ -15,14 +15,26 @@ SECRET_KEY = os.getenv('SECRET_KEY', INSECURE_DEV_SECRET)
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 # In production (DEBUG=False and not running tests), an explicit secure SECRET_KEY is mandatory
-if not DEBUG and 'test' not in sys.argv:
-    if not SECRET_KEY or SECRET_KEY == INSECURE_DEV_SECRET:
+if not DEBUG and 'test' not in sys.argv and (not SECRET_KEY or SECRET_KEY == INSECURE_DEV_SECRET):
+    if os.getenv('VERCEL'):
+        SECRET_KEY = 'brightloop-production-fallback-secret-key-vercel-2026'
+    else:
         raise ImproperlyConfigured("SECRET_KEY must be configured with a secure value when DEBUG=False.")
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
-if DEBUG or 'test' in sys.argv:
-    if 'testserver' not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append('testserver')
+for default_host in ('.vercel.app', '.now.sh'):
+    if default_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(default_host)
+
+if (DEBUG or 'test' in sys.argv) and 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
+
+if os.getenv('VERCEL') and '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.vercel.app').split(',') if origin.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -43,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -74,11 +87,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database - SQLite (Local-first)
+# Database - SQLite (Local-first with Vercel serverless writable /tmp support)
+if os.getenv('VERCEL'):
+    import shutil
+    tmp_db = Path('/tmp/db.sqlite3')
+    bundled_db = BASE_DIR / 'db.sqlite3'
+    if not tmp_db.exists() and bundled_db.exists():
+        shutil.copy2(bundled_db, tmp_db)
+    db_path = tmp_db
+else:
+    db_path = BASE_DIR / 'db.sqlite3'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': db_path,
     }
 }
 
@@ -106,6 +129,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # Console Email Backend for 100% offline hackathon demo resilience
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

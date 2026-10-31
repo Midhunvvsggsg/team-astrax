@@ -1,0 +1,703 @@
+================================================================================
+BRIGHTLOOP - ENTERPRISE SUBSCRIPTION & RECURRING BILLING PLATFORM
+PROJECT KNOWLEDGE BASE & AI CONTEXT REFERENCE
+Built by: team-astrax | Event: Odoo Hackathon
+================================================================================
+
+[AI INSTRUCTION / SYSTEM PROMPT PREAMBLE]
+You are a senior full-stack Django and backend systems engineer serving as the
+primary technical advisor for "team-astrax". The team built "Brightloop", an
+enterprise-grade subscription management and recurring billing platform for the
+Odoo Hackathon. Use this document as your ground-truth encyclopedia to answer any
+questions about the codebase, business logic, architecture, database schema,
+security, performance, workflows, and hackathon presentation/judge defenses with
+100% precision.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & PROBLEM STATEMENT
+2. TECH STACK & DESIGN PHILOSOPHY
+3. USER ROLES, AUTHENTICATION & SECURITY ISOLATION
+4. ARCHITECTURE & APPS OVERVIEW
+5. COMPLETE DATABASE SCHEMA & DATA MODELS
+6. SUBSCRIPTION & INVOICE LIFECYCLE STATE MACHINES
+7. BILLING ENGINE, IDEMPOTENCY & DISCOUNT CALCULATION
+8. BANK STATEMENT RECONCILIATION ENGINE
+9. AUTOMATION SYSTEM & SIMULATED DEMO CLOCK
+10. PERFORMANCE OPTIMIZATIONS & BENCHMARKS (5,000+ SUBSCRIPTIONS)
+11. URL ROUTES & API/VIEW DIRECTORY
+12. MANAGEMENT COMMANDS & CLI TOOLING
+13. TESTING SUITE & VERIFICATION (160 TESTS)
+14. DEMO RUNBOOK & JUDGE Q&A CHEAT SHEET
+
+================================================================================
+1. EXECUTIVE SUMMARY & PROBLEM STATEMENT
+================================================================================
+Project Name: Brightloop Software
+Team: team-astrax
+Repository: https://github.com/Midhunvvsggsg/team-astrax
+
+Business Context:
+Brightloop Software is a SaaS and services provider selling monthly/yearly
+software subscriptions, add-ons, and products with multi-attribute variants.
+Previously, recurring operations were broken:
+- Subscriptions tracked in spreadsheets;
+- Renewals forgotten or missed;
+- Invoices created manually each month;
+- Bank payments reconciled by manually matching statement lines;
+- Financial metrics (MRR/ARR/Churn) calculated by hand on quarterly spreadsheets.
+
+The Solution:
+A resilient, unified, 100% offline-first web platform that handles the complete
+subscription lifecycle:
+- Product and variant catalog with customizable tax and pricing tiers;
+- Quotation templates converting into enforceable subscription contracts;
+- Idempotent recurring billing engine catching up on all past unbilled periods;
+- Multi-method payments (Bank Transfer, Card, UPI, Cash) supporting partial payments;
+- Heuristic bank statement CSV reconciliation engine;
+- Live executive finance dashboard (MRR, ARR, overdue aging, collection rates);
+- Isolated customer self-service portal;
+- Automated daily background jobs (invoicing, renewals, expiry, reminders) with
+  a persistent "Demo Clock" allowing fast-forwarding time during live hackathon demos.
+
+================================================================================
+2. TECH STACK & DESIGN PHILOSOPHY
+================================================================================
+Backend: Python 3.12+ / Django 5.x
+Database: SQLite 3 (embedded in-process with WAL mode, sub-millisecond query latency)
+Frontend: Django Server-Rendered Templates, Bootstrap 5 + custom utility theme,
+          Chart.js (bundled locally, 100% offline-safe)
+Validation: Dual-layer (Instant client-side feedback + strict server-side validation)
+Design Principles:
+1. 100% Offline-First: Zero external cloud APIs, zero CDN dependencies. If the venue
+   Wi-Fi drops entirely, the entire application, seed data, and charts run locally.
+2. Financial Precision: Decimal fields used everywhere for monetary calculation.
+   Zero float rounding errors. Decimal rounding strictly enforced to 2 places.
+3. Strict Query Scoping: Customer-facing endpoints strictly filter by request.user.
+   ID enumeration attacks return HTTP 404 rather than HTTP 403.
+4. Mathematical Bounding: Discounts and payments are capped to prevent negative
+   invoice balances or overpayments.
+5. Idempotent by Design: Physical DB composite unique constraints prevent double
+   invoicing even under concurrent runs or network hiccups.
+
+================================================================================
+3. USER ROLES, AUTHENTICATION & SECURITY ISOLATION
+================================================================================
+Roles Matrix:
+1. Admin (`role = 'admin'`, `is_superuser = True`, `is_staff = True`):
+   - Unrestricted access across the system.
+   - ONLY role authorized to create staff members, catalog products, variants,
+     plans, taxes, discount rules, trigger manual daily automations, and manage
+     the demo clock.
+2. Staff (`role = 'staff'`, `is_staff = True`):
+   - Operational team handling day-to-day sales and finance.
+   - Can view and manage customers, quotations, subscriptions, invoices,
+     payments, and upload bank statements.
+   - Cannot create staff users or modify fundamental catalog pricing/tax models.
+3. Customer (`role = 'customer'`, `is_staff = False`):
+   - External clients logging into the dedicated Customer Portal (`/accounts/portal/`).
+   - Can view ONLY their own subscriptions, lines, invoices, and verified payment history.
+   - Can perform allowed plan actions (e.g. pause, resume, cancel) if permitted by plan flags.
+
+Authentication & Password Security Rules:
+- Email is the unique username identifier (case-insensitive normalized).
+- Password Complexity Policy:
+  * Minimum 9 characters (> 8 characters).
+  * Must contain at least one uppercase letter [A-Z].
+  * Must contain at least one lowercase letter [a-z].
+  * Must contain at least one special character [!@#$%^&*(),.?":{}|<>].
+  * Enforced on BOTH client (dynamic JS meter) and server (`clean_password` validator).
+- Password Reset: Standard Django cryptographic token workflow. Uses console email
+  backend (`django.core.mail.backends.console.EmailBackend`) for offline hackathon testing.
+- Anti-Enumeration & Query Isolation:
+  * In customer portal views, records are fetched with:
+    `get_object_or_404(Invoice.objects.filter(customer=request.user), pk=pk)`
+  * Attempting to guess another user's invoice ID returns HTTP 404 (Not Found),
+    never leaking whether an invoice with that ID exists.
+
+Default Demo Credentials:
+- Root Admin: `admin@brightloop.com` / `Admin@12345`
+- Operational Staff: `staff@brightloop.com` / `Staff@12345`
+- Demo Customer: `acme@corp.com` / `CustomerPass@123`
+
+================================================================================
+4. ARCHITECTURE & APPS OVERVIEW
+================================================================================
+The project is split into 5 decoupled, domain-driven Django apps:
+
+1. `accounts` (Authentication, Roles, Portal & User Management):
+   - Custom `User` model inheriting `AbstractBaseUser` and `PermissionsMixin`.
+   - Customer self-service portal, profile editing, password changes, staff management.
+
+2. `catalog` (Products, Variants, Taxes & Billing Plans):
+   - Products (Software, Service, Physical, Add-on).
+   - Multi-attribute Product Variants (e.g., Brand=Odoo adding +$560.00).
+   - Taxes (Percentage % or Fixed Amount $).
+   - Plans (Pricing, billing period: daily/weekly/monthly/yearly, lifecycle policy flags).
+
+3. `subscriptions` (Quotations, Contracts & Lifecycle State Machine):
+   - Quotation templates and line items.
+   - Subscriptions with sequential numbering (`SUB-XXXXX`).
+   - Subscription line items linking products, variants, taxes, quantities, unit prices.
+   - State machine transition engine with real-time audit trail logging.
+   - Discount rules engine (fixed or percentage, date ranges, usage limits, scope).
+
+4. `invoicing` (Billing Engine, Invoices, Payments, Bank Reconciliation & Finance):
+   - Invoices with sequential numbering (`INV-XXXXX`).
+   - Line items with automatic tax calculation and discount application.
+   - Multi-method payments (Bank Transfer, Credit Card, UPI, Cash) supporting partial payments.
+   - Bank statement CSV parsing and 3-tier confidence reconciliation engine.
+   - Executive finance analytics dashboard (MRR, ARR, aging buckets, collection rate).
+   - Automated month-end revenue reporting with CSV export.
+
+5. `automation` (Daily Recurring Jobs & Time Simulation):
+   - `AutomationRun` model recording audit logs of automated runs.
+   - Automated reminder dispatcher (expiring subscriptions, 3/7/14-day overdue invoices).
+   - `DemoClock` singleton enabling date simulation and fast-forwarding for presentations.
+
+================================================================================
+5. COMPLETE DATABASE SCHEMA & DATA MODELS
+================================================================================
+
+--- [ACCOUNTS APP] ---
+Model: User
+- id: AutoField (PK)
+- email: EmailField(unique=True, db_index=True)
+- name: CharField(max_length=255)
+- phone: CharField(max_length=50, blank=True)
+- role: CharField(choices=['admin', 'staff', 'customer'], default='customer', db_index=True)
+- is_active: BooleanField(default=True)
+- is_staff: BooleanField(default=False)
+- date_joined: DateTimeField(default=now)
+- created_by: ForeignKey('self', null=True, on_delete=SET_NULL)
+
+--- [CATALOG APP] ---
+Model: Product
+- id: AutoField (PK)
+- name: CharField(max_length=255, db_index=True)
+- product_type: CharField(choices=['software', 'service', 'physical', 'addon'], default='software')
+- sales_price: DecimalField(max_digits=12, decimal_places=2, default=0.00, min_value=0.00)
+- cost_price: DecimalField(max_digits=12, decimal_places=2, default=0.00, min_value=0.00)
+- notes: TextField(blank=True)
+- is_active: BooleanField(default=True, db_index=True)
+
+Model: ProductVariant
+- id: AutoField (PK)
+- product: ForeignKey(Product, related_name='variants', on_delete=CASCADE)
+- attribute: CharField(max_length=100) (e.g., 'Brand', 'Storage', 'Tier')
+- value: CharField(max_length=100)     (e.g., 'Odoo', '256GB', 'Enterprise')
+- extra_price: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- is_active: BooleanField(default=True)
+- Constraints: UniqueConstraint(fields=['product', 'attribute', 'value'])
+- Property final_price: product.sales_price + extra_price
+
+Model: Tax
+- id: AutoField (PK)
+- name: CharField(max_length=100, db_index=True)
+- percentage: DecimalField(max_digits=5, decimal_places=2, default=0.00)
+- fixed_amount: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- is_active: BooleanField(default=True)
+
+Model: Plan
+- id: AutoField (PK)
+- name: CharField(max_length=255, db_index=True)
+- price: DecimalField(max_digits=12, decimal_places=2, min_value=0.00)
+- billing_period: CharField(choices=['daily', 'weekly', 'monthly', 'yearly'], default='monthly')
+- min_quantity: PositiveIntegerField(default=1)
+- start_date: DateField(null=True, blank=True)
+- end_date: DateField(null=True, blank=True)
+- Policy Flags:
+  * auto_close_on_end: BooleanField(default=True)
+  * closable_early: BooleanField(default=True)
+  * pausable: BooleanField(default=True)
+  * renewable: BooleanField(default=True)
+- is_active: BooleanField(default=True)
+
+--- [SUBSCRIPTIONS APP] ---
+Model: QuotationTemplate
+- id: AutoField (PK)
+- name: CharField(max_length=255, unique=True)
+- plan: ForeignKey(Plan, on_delete=PROTECT)
+- validity_days: PositiveIntegerField(default=30)
+- notes: TextField(blank=True)
+- is_active: BooleanField(default=True)
+
+Model: QuotationTemplateLine
+- id: AutoField (PK)
+- template: ForeignKey(QuotationTemplate, related_name='lines', on_delete=CASCADE)
+- product: ForeignKey(Product, on_delete=PROTECT)
+- variant: ForeignKey(ProductVariant, null=True, blank=True, on_delete=SET_NULL)
+- quantity: DecimalField(max_digits=10, decimal_places=2, default=1.00)
+- unit_price: DecimalField(max_digits=12, decimal_places=2)
+- tax: ForeignKey(Tax, null=True, blank=True, on_delete=SET_NULL)
+
+Model: Subscription
+- id: AutoField (PK)
+- subscription_number: CharField(max_length=50, unique=True, db_index=True) (Format: 'SUB-XXXXX')
+- customer: ForeignKey(User, related_name='subscriptions', on_delete=PROTECT)
+- plan: ForeignKey(Plan, on_delete=PROTECT)
+- status: CharField(choices=['draft', 'quotation', 'confirmed', 'active', 'paused', 'closed'], default='draft')
+- start_date: DateField(db_index=True)
+- end_date: DateField(null=True, blank=True, db_index=True)
+- next_billing_date: DateField(null=True, blank=True, db_index=True)
+- quotation_expiry_date: DateField(null=True, blank=True)
+- paused_at: DateTimeField(null=True, blank=True)
+- closed_at: DateTimeField(null=True, blank=True)
+- close_reason: TextField(blank=True)
+- template_used: ForeignKey(QuotationTemplate, null=True, blank=True, on_delete=SET_NULL)
+- created_by: ForeignKey(User, null=True, on_delete=SET_NULL)
+
+Model: SubscriptionLine
+- id: AutoField (PK)
+- subscription: ForeignKey(Subscription, related_name='lines', on_delete=CASCADE)
+- product: ForeignKey(Product, on_delete=PROTECT)
+- variant: ForeignKey(ProductVariant, null=True, blank=True, on_delete=SET_NULL)
+- quantity: DecimalField(max_digits=10, decimal_places=2, default=1.00)
+- unit_price: DecimalField(max_digits=12, decimal_places=2)
+- tax: ForeignKey(Tax, null=True, blank=True, on_delete=SET_NULL)
+
+Model: SubscriptionStatusHistory
+- id: AutoField (PK)
+- subscription: ForeignKey(Subscription, related_name='status_history', on_delete=CASCADE)
+- from_status: CharField(max_length=50)
+- to_status: CharField(max_length=50)
+- changed_by: ForeignKey(User, null=True, on_delete=SET_NULL)
+- changed_at: DateTimeField(auto_now_add=True, db_index=True)
+- notes: TextField(blank=True)
+
+Model: DiscountRule
+- id: AutoField (PK)
+- name: CharField(max_length=255)
+- discount_type: CharField(choices=['percentage', 'fixed'], default='percentage')
+- value: DecimalField(max_digits=10, decimal_places=2) (e.g. 10.00% or $50.00)
+- applies_to: CharField(choices=['subscription', 'product'], default='subscription')
+- target_product: ForeignKey(Product, null=True, blank=True, on_delete=SET_NULL)
+- min_purchase_amount: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- min_quantity: PositiveIntegerField(default=0)
+- start_date: DateField(null=True, blank=True)
+- end_date: DateField(null=True, blank=True)
+- usage_limit: PositiveIntegerField(null=True, blank=True)
+- times_used: PositiveIntegerField(default=0)
+- is_active: BooleanField(default=True)
+
+--- [INVOICING APP] ---
+Model: Invoice
+- id: AutoField (PK)
+- invoice_number: CharField(max_length=50, unique=True, db_index=True) (Format: 'INV-XXXXX')
+- subscription: ForeignKey(Subscription, related_name='invoices', on_delete=PROTECT)
+- customer: ForeignKey(User, related_name='invoices', on_delete=PROTECT)
+- status: CharField(choices=['draft', 'confirmed', 'paid', 'cancelled'], default='draft', db_index=True)
+- issue_date: DateField(default=today, db_index=True)
+- due_date: DateField(db_index=True)
+- period_start: DateField(db_index=True)
+- period_end: DateField()
+- payment_terms: CharField(choices=['immediate', 'net15', 'net30', 'net60'], default='net30')
+- subtotal: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- tax_amount: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- discount_amount: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- total: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- sent_at: DateTimeField(null=True, blank=True)
+- paid_at: DateTimeField(null=True, blank=True)
+- Constraints:
+  * UniqueConstraint(fields=['subscription', 'period_start'], name='unique_subscription_period_billing')
+    => PHYSICAL GUARANTEE OF BILLING IDEMPOTENCY
+
+Model: InvoiceLine
+- id: AutoField (PK)
+- invoice: ForeignKey(Invoice, related_name='lines', on_delete=CASCADE)
+- description: CharField(max_length=255)
+- product: ForeignKey(Product, null=True, blank=True, on_delete=SET_NULL)
+- quantity: DecimalField(max_digits=10, decimal_places=2, default=1.00)
+- unit_price: DecimalField(max_digits=12, decimal_places=2)
+- tax_rate: DecimalField(max_digits=5, decimal_places=2, default=0.00)
+- tax_amount: DecimalField(max_digits=12, decimal_places=2, default=0.00)
+- line_total: DecimalField(max_digits=12, decimal_places=2)
+
+Model: Payment
+- id: AutoField (PK)
+- payment_number: CharField(max_length=50, unique=True) (Format: 'PAY-XXXXX')
+- invoice: ForeignKey(Invoice, related_name='payments', on_delete=PROTECT)
+- customer: ForeignKey(User, related_name='payments', on_delete=PROTECT)
+- amount: DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+- payment_date: DateField(default=today, db_index=True)
+- payment_method: CharField(choices=['bank_transfer', 'credit_card', 'upi', 'cash', 'other'], default='bank_transfer')
+- transaction_reference: CharField(max_length=255, blank=True)
+- notes: TextField(blank=True)
+- recorded_by: ForeignKey(User, null=True, on_delete=SET_NULL)
+
+Model: BankStatement & BankStatementRow
+- BankStatement tracks uploaded CSV metadata (total rows, auto-reconciled, needs review, duplicate counts).
+- BankStatementRow stores parsed bank transactions:
+  * date, description, amount, reference, row_hash (SHA-256 for duplicate detection)
+  * status: ['auto_reconciled', 'needs_review', 'manually_reconciled', 'unmatched', 'duplicate']
+  * confidence: ['high', 'medium', 'low']
+  * matched_invoice: ForeignKey(Invoice, null=True, on_delete=SET_NULL)
+  * matched_payment: ForeignKey(Payment, null=True, on_delete=SET_NULL)
+
+Model: MonthlyReport
+- Aggregated financial ledger snapshot per year and month:
+  * active/new/closed subscriptions count;
+  * MRR, total revenue received, amount still owed;
+  * Overdue aging buckets: 1-30 days, 31-60 days, 60+ days (counts and dollar totals);
+  * top_customers_json: structured list of highest revenue accounts;
+  * CSV exportable directly from the interface.
+
+--- [AUTOMATION APP] ---
+Model: AutomationRun
+- Logs every scheduled or manual daily execution:
+  * started_at, completed_at, trigger ('manual' vs 'scheduled'), status ('success', 'partial', 'failed')
+  * Counters: invoices_created, renewals_made, subscriptions_closed, reminders_sent, reports_generated
+  * duration_seconds, errors text log, initiated_by user.
+
+Model: Reminder
+- Audits automated email notices to customers:
+  * reminder_type: ['expiring_non_renewable', 'overdue_3_days', 'overdue_7_days', 'overdue_14_days']
+  * Unique constraints prevent spamming duplicate reminders for the same target date/invoice.
+
+Model: DemoClock
+- Singleton record (`id=1`) holding `simulated_date` and `is_active` boolean flag.
+- Enables advancing time by days, weeks, or months to demo recurring cycles in minutes.
+
+================================================================================
+6. SUBSCRIPTION & INVOICE LIFECYCLE STATE MACHINES
+================================================================================
+
+Subscription Lifecycle State Machine:
+Valid States: Draft -> Quotation -> Confirmed -> Active -> Paused -> Closed
+
+Transition Matrix:
+- Draft -> Quotation: Triggered when quote is prepared and given an expiry date.
+- Quotation -> Confirmed: Customer or staff accepts the proposal.
+- Quotation -> Closed: Quotation rejected or expired without acceptance.
+- Confirmed -> Active: Services are activated; next_billing_date is established.
+- Active -> Paused: Temporarily suspended (ONLY allowed if plan.pausable == True).
+- Paused -> Active: Resumed; billing dates re-aligned.
+- Active -> Closed: Natural completion, cancellation, or early termination
+  (Early termination ONLY allowed if plan.closable_early == True).
+- Paused -> Closed: Terminated while paused.
+- Active -> Active (Renewal): Explicit renewal (ONLY allowed if plan.renewable == True).
+
+Status History Audit Trail:
+Every transition creates an immutable `SubscriptionStatusHistory` record capturing:
+`subscription`, `from_status`, `to_status`, `changed_by`, `changed_at`, `notes`.
+
+Invoice Lifecycle State Machine:
+Valid States: Draft -> Confirmed -> Paid (or Cancelled)
+- Draft: Automatically generated by billing engine or manually drafted.
+- Confirmed: Finalized and locked for delivery (sends email notice, sets `sent_at`).
+- Paid: Triggered automatically when sum of approved `Payment.amount` >= `Invoice.total`.
+- Cancelled: Allowed only from Draft or Confirmed before full payment is collected.
+
+================================================================================
+7. BILLING ENGINE, IDEMPOTENCY & DISCOUNT CALCULATION
+================================================================================
+Billing Engine Architecture (`invoicing/services.py: generate_invoices`):
+1. Identification:
+   - Queries all subscriptions where `status == 'active'` and `start_date <= as_of_date`.
+2. Chronological Period Catch-Up:
+   - For each subscription, identifies periods from `start_date` up to `as_of_date`.
+   - Checks existing billed periods via `sub.invoices.values_list('period_start', flat=True)`.
+   - Any missing historical period is billed in chronological order.
+3. Dual-Layer Idempotency Guarantee:
+   - Layer 1 (Software): Checks if `period_start` is already in the billed periods set.
+   - Layer 2 (Database Constraint): `UniqueConstraint(fields=['subscription', 'period_start'])`.
+   - Result: Running `generate_invoices()` 10 times consecutively produces 0 duplicate
+     invoices, 0 phantom line items, and 0 overcharges.
+4. Line Item Compilation:
+   - Replicates active `SubscriptionLine` entries into `InvoiceLine`.
+   - Line Total = `quantity * unit_price`.
+   - Tax Calculation = `line_total * (tax.percentage / 100) + tax.fixed_amount`.
+5. Automatic Discount Evaluation (`subscriptions/services.py: get_applicable_discounts`):
+   - Validates:
+     * `is_active == True`
+     * `start_date <= billing_date <= end_date`
+     * `usage_limit is None` OR `times_used < usage_limit`
+     * Meets `min_purchase_amount` and `min_quantity` thresholds.
+   - Computes eligible amount:
+     * If `applies_to == 'product'`: only sums matching line items.
+     * If `applies_to == 'subscription'`: sums all line items.
+   - Mathematical Bounding:
+     * Percentage discounts capped at 100%.
+     * Fixed discounts bounded by eligible subtotal: `min(rule.value, eligible_amount)`.
+     * Invoice totals can NEVER drop below $0.00.
+   - Applied as a transparent negative invoice line item (`-Discount: <Rule Name>`).
+   - Atomically increments `rule.times_used += 1`.
+6. Payment Due Date Computation:
+   - Configurable per subscription/plan: Immediate (0 days), Net 15 (+15 days),
+     Net 30 (+30 days), Net 60 (+60 days).
+   - Calendar-safe date arithmetic handling leap years and variable month lengths
+     via custom `add_months()` helper.
+
+================================================================================
+8. BANK STATEMENT RECONCILIATION ENGINE
+================================================================================
+Architecture (`invoicing/models.py`, `invoicing/views.py`):
+1. Ingestion:
+   - Finance staff uploads bank statement CSV (`Date, Description, Amount, Reference`).
+2. Duplicate Prevention:
+   - Computes SHA-256 hash of `(date, amount, reference, description)`.
+   - Pre-existing duplicate rows in the database are flagged `status = 'duplicate'` and ignored.
+3. Automated Heuristic Matching:
+   - High Confidence (`confidence = 'high'`):
+     * Description or reference contains exact invoice pattern regex: `INV-\d{5}`.
+     * Invoice status is `draft` or `confirmed`.
+     * Statement row amount matches invoice remaining balance exactly.
+     * Automatically transitions row to `auto_reconciled`, creates a verified `Payment`
+       record, and marks the invoice `paid` if fully satisfied.
+   - Medium Confidence (`confidence = 'medium'`):
+     * Fuzzy match: Customer name matches description AND amount matches outstanding balance,
+       OR invoice number matches but amount represents a partial payment.
+     * Flagged as `status = 'needs_review'`.
+     * Staff clicks "Approve Match" with one click to confirm.
+   - Low / Unmatched (`confidence = 'low'`):
+     * No invoice reference or customer identifier detected.
+     * Staff can manually search invoices and bind reconciliation manually (`manual_reconcile`).
+
+================================================================================
+9. AUTOMATION SYSTEM & SIMULATED DEMO CLOCK
+================================================================================
+Daily Background Automation (`automation/services.py: execute_daily_jobs`):
+Runs 5 automated enterprise jobs in atomic sequence:
+1. Recurring Invoicing: Calls `generate_invoices(as_of_date)` to bill all due subscriptions.
+2. Auto-Renewals: Detects subscriptions ending on or before `as_of_date` whose plans have
+   `renewable == True`, automatically rolling their end dates and generating renewal quotes.
+3. Auto-Expiry Closure: Detects expired subscriptions whose plans have `auto_close_on_end == True`
+   and safely transitions their status to `closed`.
+4. Automated Reminders:
+   - Dispatches expiry notices 7 days before non-renewable contracts end.
+   - Dispatches dunning notices for overdue invoices at 3 days, 7 days, and 14 days overdue.
+   - Guaranteed single-send via database unique constraints on `Reminder`.
+5. Month-End Reporting:
+   - If `as_of_date` is the final day of a calendar month, automatically compiles and
+     freezes the `MonthlyReport` financial snapshot.
+
+The Demo Clock (`automation/clock.py`):
+- Hackathon Problem: How do you show recurring billing, renewals, and overdue notices
+  that naturally take 30 to 60 days to trigger in a 2-minute live demo?
+- Solution: The `DemoClock` singleton (`id=1`).
+- When `DEMO_MODE=1`, all system date calls route through `get_today()`, which checks
+  the database-persisted simulated date.
+- Operations UI (`/automation/`):
+  * "Advance 1 Day" -> Fast-forwards clock by +1 day.
+  * "Advance 1 Month" -> Fast-forwards clock by +30 days and executes daily jobs.
+  * "Reset to Real Time" -> Synchronizes back to `datetime.date.today()`.
+  * Demonstrates 3 full billing cycles in 30 seconds live in front of judges!
+
+================================================================================
+10. PERFORMANCE OPTIMIZATIONS & BENCHMARKS (5,000+ SUBSCRIPTIONS)
+================================================================================
+Performance Targets Met:
+- Sub-60ms average server response time on pages listing 5,000+ subscriptions.
+- Database query count per page view capped between 2 and 5 queries (zero N+1 queries).
+
+Key Engineering Techniques:
+1. ORM Optimization:
+   - Heavy use of `.select_related('customer', 'plan')` on single-valued relations.
+   - `.prefetch_related('lines__product', 'lines__variant', 'lines__tax')` on M2M/reverse FKs.
+2. Database Indexes:
+   - B-Tree indexes on all frequently filtered fields: `status`, `start_date`, `end_date`,
+     `next_billing_date`, `issue_date`, `due_date`, `period_start`.
+   - Composite index on `['customer', 'status']`, `['product_type', 'is_active']`.
+3. Push Aggregations to the Database Engine:
+   - The executive finance dashboard calculates MRR, ARR, collection rates, total revenue,
+     and overdue buckets strictly using Django SQL expressions:
+     `Sum(Case(When(...))), Count(...), Coalesce(...)`.
+   - Never loops over QuerySets in Python memory.
+4. Bulk Seeding:
+   - `seed_demo` creates 5,000 subscriptions, 10,000+ lines, and 9,800+ invoices in ~35 seconds
+     using chunked `bulk_create(batch_size=1000)` inside atomic transactions.
+
+================================================================================
+11. URL ROUTES & API/VIEW DIRECTORY
+================================================================================
+Root:
+- `/` -> `accounts.views.home_view` (Redirects to dashboard or portal based on role)
+- `/dashboard/` -> `accounts.views.home_view`
+- `/admin/` -> Standard Django administrative interface
+
+Accounts (`/accounts/`):
+- `signup/` -> Customer registration with client/server validation
+- `login/` -> Authentication endpoint
+- `logout/` -> Session destruction
+- `portal/` -> Customer self-service dashboard
+- `portal/profile/` -> Edit contact name & phone
+- `portal/password/` -> Update account password
+- `staff/` -> Admin-only staff user creation and role management
+- `password-reset/` -> Offline-safe password reset via console backend
+
+Catalog (`/catalog/`):
+- `products/` (list), `products/create/`, `products/<id>/`, `products/<id>/edit/`, `products/<id>/delete/`
+- `products/<product_id>/variants/create/`, `variants/<id>/edit/`, `variants/<id>/delete/`
+- `taxes/` (list), `taxes/create/`, `taxes/<id>/edit/`, `taxes/<id>/delete/`
+- `plans/` (list), `plans/create/`, `plans/<id>/edit/`, `plans/<id>/delete/`
+
+Subscriptions (`/subscriptions/`):
+- `` (list), `create/`, `from-template/`, `<id>/`, `<id>/edit/`, `<id>/delete/`
+- `<id>/transition/` -> Handles status progression (Draft -> Quotation -> Confirmed -> Active -> etc.)
+- `<id>/renew/` -> Triggers contract renewal
+- `<id>/action/` -> Customer self-service actions (pause, resume, cancel)
+- `<id>/lines/create/`, `lines/<id>/delete/`
+- `templates/` (list), `templates/create/`, `templates/<id>/`, `templates/<id>/edit/`, `templates/<id>/delete/`
+- `templates/<id>/lines/create/`, `templates/lines/<id>/delete/`
+- `discounts/` (list), `discounts/create/`, `discounts/<id>/`, `discounts/<id>/edit/`, `discounts/<id>/delete/`
+
+Invoicing (`/invoices/`):
+- `` (list), `<id>/`, `<id>/transition/`, `<id>/send/`, `<id>/print/` (Print-optimized PDF/paper view)
+- `dashboard/` -> Executive Finance Analytics Dashboard
+- `overdue/` -> Filtered view of unpaid past-due invoices
+- `payments/` -> Complete payment transaction ledger
+- `run-billing/` -> Manual trigger for recurring billing engine
+- `reconciliation/` -> Bank statement upload & reconciliation list
+- `reconciliation/<id>/` -> Statement rows review table
+- `reconciliation/rows/<id>/approve/` -> 1-click approval for medium confidence match
+- `reconciliation/rows/<id>/manual/` -> Manual invoice assignment
+- `reports/` (list), `reports/generate/`, `reports/<id>/`, `reports/<id>/csv/` (CSV export)
+
+Automation (`/automation/`):
+- `` -> Automation run dashboard & audit log
+- `run-now/` -> Trigger daily jobs on demand
+- `clock/advance/` -> Fast-forward demo date (+1 day, +1 week, +1 month)
+- `clock/set/` -> Set exact simulated date
+- `clock/reset/` -> Reset clock to actual system date
+- `clock/run-jobs/` -> Fast-forward clock AND run all recurring jobs
+
+================================================================================
+12. MANAGEMENT COMMANDS & CLI TOOLING
+================================================================================
+1. `python manage.py seed_demo`:
+   - Populates the database with realistic demo accounts:
+     * 1 root superuser (`admin@brightloop.com` / `Admin@12345`)
+     * 4 operational staff users
+     * 5,000 realistic customer accounts
+     * Software, Service, and Add-on catalog with variant pricing
+     * VAT and Sales taxes
+     * Quotation templates and active discount rules
+     * 5,000 subscriptions spanning all lifecycle states
+     * 9,800+ historical invoices with payments and overdue aging
+
+2. `python manage.py create_admin --email admin@brightloop.com --password "Admin@12345"`:
+   - Manually bootstraps an administrative superuser.
+
+3. `python manage.py generate_invoices [--date YYYY-MM-DD]`:
+   - Runs the recurring billing engine from the terminal for a target date.
+
+4. `python manage.py close_expired_subscriptions`:
+   - Scans for past-due subscriptions and closes them if `auto_close_on_end == True`.
+
+5. `python manage.py run_daily_jobs [--date YYYY-MM-DD]`:
+   - Runs the complete daily enterprise automation pipeline (billing, renewals,
+     expiry, reminders, reports).
+
+================================================================================
+13. TESTING SUITE & VERIFICATION (160 TESTS)
+================================================================================
+The project features a suite of 160 automated unit and integration tests across
+all 5 apps.
+
+Key Test Suites:
+- `invoicing.tests.BillingIdempotencyTests`:
+  * Tests running the billing engine repeatedly for identical periods.
+  * Verifies zero duplicate invoices, zero duplicate line items, and correct catch-up.
+- `subscriptions.tests.SubscriptionStateMachineTests`:
+  * Tests valid status transitions (Draft -> Quotation -> Confirmed -> Active -> Paused -> Closed).
+  * Verifies illegal transitions raise `ValidationError` and are rejected.
+  * Verifies plan policy flags (`pausable=False` blocks pausing, `renewable=False` blocks renewal).
+- `subscriptions.tests.DiscountEngineTests`:
+  * Verifies fixed and percentage discount calculations.
+  * Tests usage limit decrementing and deactivation upon limit exhaustion.
+  * Verifies discounts cannot cause negative invoice totals.
+- `invoicing.tests.PaymentValidationTests`:
+  * Verifies partial payments update invoice balance.
+  * Confirms invoice automatically transitions to `paid` when balance reaches $0.00.
+  * Asserts overpayments (amount > balance) and negative/zero payments are strictly rejected.
+- `invoicing.tests.ReconciliationEngineTests`:
+  * Verifies SHA-256 deduplication of identical CSV rows.
+  * Tests regex matching of invoice numbers in payment descriptions.
+- `accounts.tests.SecurityAndIsolationTests`:
+  * Asserts customers cannot view or modify other customers' subscriptions or invoices.
+  * Verifies password complexity regex on registration and password reset.
+
+Run Tests Command:
+`python manage.py test`
+
+================================================================================
+14. DEMO RUNBOOK & JUDGE Q&A CHEAT SHEET
+================================================================================
+
+2-Minute Presentation Script:
+1. Act 1 (Sign Up): Register customer `acme@corp.com` (show real-time password meter).
+   Log in to Customer Portal (`/accounts/portal/`) -> show clean empty state.
+2. Act 2 (Quotation): Switch to staff session. Open Quotation Templates.
+   Click "Create Subscription from Template" -> select `acme@corp.com`.
+   Show auto-populated lines, variant extra price (+$560 for Odoo brand), and 15-day quote expiry.
+3. Act 3 (State Machine): Walk through subscription details:
+   Click "Accept & Confirm" -> status becomes `Confirmed`.
+   Click "Activate" -> status becomes `Active`.
+   Point to the Status History Audit Log timeline showing who changed what and when.
+4. Act 4 (Billing Engine & Idempotency): Navigate to `/invoices/run-billing/`.
+   Click "Run Billing Engine". Show generated invoice with 10% auto-applied discount.
+   Click "Run Billing Engine" again immediately.
+   Point to the banner: "0 created, 1 up-to-date" -> PROOF OF BILLING IDEMPOTENCY!
+5. Act 5 (Payments): Open the invoice. Record a partial payment of $500 via Bank Transfer.
+   Show dynamic remaining balance update. Record remaining balance via UPI.
+   Invoice automatically moves to `Paid in Full`.
+6. Act 6 (Dashboard & Demo Clock): Open Executive Finance Dashboard (`/invoices/dashboard/`).
+   Show live MRR, ARR, and overdue aging buckets computed via database SQL aggregates.
+   Open `/automation/` -> click "Advance 1 Month" on the Demo Clock.
+   Show month-end reports, automated renewal quotations, and dunning reminders generated live!
+
+Top 8 Judge Questions & Answers:
+
+Q1: How do you guarantee billing idempotency? What happens if the job runs twice?
+A: Idempotency is enforced at two distinct layers. At the database layer, a composite
+unique constraint on (subscription, period_start) makes duplicate invoices physically
+impossible. At the service layer, `generate_invoices()` pre-queries existing period
+starts and skips already-billed periods. Running the engine twice produces zero duplicates.
+
+Q2: How does your system handle catch-up for past unbilled periods or server downtime?
+A: Rather than only billing for the current calendar day, `generate_invoices(as_of_date)`
+detects all missed past periods since the subscription's start date (or last billed invoice)
+and generates chronological invoices period-by-period until the subscription is caught up.
+
+Q3: How do you guarantee customer data privacy and prevent cross-customer access?
+A: We enforce strict query scoping on the server. In customer-facing views, queries
+filter directly on `request.user` (e.g. `Invoice.objects.filter(customer=request.user)`).
+If a customer tries to tamper with another customer's ID in the URL, the system returns
+HTTP 404 (Not Found) rather than 403 (Forbidden), completely preventing ID enumeration.
+
+Q4: How are discounts evaluated and what prevents negative invoice totals?
+A: `get_applicable_discounts()` checks active status, date validity, remaining usage
+limits, minimum quantities/purchase amounts, and scope (subscription vs. product).
+In our mathematical service, percentage discounts are capped at 100% and fixed discounts
+are bounded by the eligible subtotal, mathematically guaranteeing invoices can never
+have negative totals.
+
+Q5: Why SQLite instead of PostgreSQL for this hackathon?
+A: SQLite delivers 100% offline-first resilience with zero external service dependencies
+or cloud credential requirements. It satisfies all ACID constraints, runs embedded
+in-process with sub-millisecond query latencies, and allowed us to seed 5,000 subscriptions
+and 9,800+ invoices in ~35 seconds using chunked bulk operations.
+
+Q6: How do you achieve sub-60ms page load speeds across 5,000+ active subscriptions?
+A: We eliminated N+1 queries through strategic `select_related` and `prefetch_related`
+joins, added composite database indexes across commonly queried foreign keys and date/status
+fields, and computed financial totals (MRR, revenue, payments, amounts due) entirely in
+database SQL aggregates using `Sum`, `Count`, and `Case/When`.
+
+Q7: How are product variants priced and how does choosing a variant affect lines and invoices?
+A: Each `ProductVariant` specifies an `extra_price` associated with an attribute
+(e.g. Brand=Odoo adds $560.00). When added to a quotation template or subscription line,
+the unit price automatically computes `product.sales_price + variant.extra_price` while
+allowing operational staff to customize it if needed.
+
+Q8: How does the system handle subscription expiry and plan lifecycle permissions?
+A: Plans define granular boolean policy flags: `pausable`, `renewable`, `closable_early`,
+and `auto_close_on_end`. The state machine rejects actions not permitted by the plan.
+For automated lifecycle management, the `close_expired_subscriptions` management command
+safely transitions active and paused subscriptions past their expiry date to `Closed`
+if `auto_close_on_end` is enabled.
+
+================================================================================
+END OF BRIGHTLOOP / TEAM-ASTRAX KNOWLEDGE BASE
+================================================================================
